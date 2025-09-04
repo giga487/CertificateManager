@@ -14,11 +14,11 @@ namespace CertificateManager.Controllers
         }
 
         [HttpGet("Make")]
-        public IActionResult GetCertificates(string address)
+        public IActionResult GetCertificates(string address, string company)
         {
             try
             {
-                _certificationManager?.CreatingPFX_CRT(address, "FINCANTIERI NEXTECH", ".1q2w3e!", DateTimeOffset.Now + TimeSpan.FromDays(3650));
+                _certificationManager?.CreatingPFX_CRT(address, company, ".1q2w3e!", DateTimeOffset.Now + TimeSpan.FromDays(3650));
                 return Ok();
             }
             catch
