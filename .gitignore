@@ -1,0 +1,15 @@
+/.vs
+/CertificateCommon/bin
+/CertificateCommon/obj
+/CertificateManager.Client/bin
+/CertificateManager.Client/obj
+/CertificateManager/bin
+/CertificateManager/obj
+/Common/bin
+/Common/obj
+/publish
+/UT/bin
+/UT/obj
+*.crt
+*.pfx
+/CertificateManager/LOG
