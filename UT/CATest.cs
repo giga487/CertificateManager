@@ -35,8 +35,8 @@ namespace UT
         [TestMethod]
         public void CreatingChildren()
         {
-            using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256); // Uso di ECDsa come da te suggerito
-            X509Certificate2? cert = Manager.CreateCASon("localhost", "PACompany", serverKey, DateTimeOffset.Now + TimeSpan.FromDays(365));
+            using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            X509Certificate2? cert = Manager?.CreateCASon("server1", "localhost", "PACompany", serverKey, DateTimeOffset.Now + TimeSpan.FromDays(365));
             
             if(cert == null)
             {

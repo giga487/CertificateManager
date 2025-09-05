@@ -1,10 +1,16 @@
 ﻿using Microsoft.Extensions.Configuration;
+using System.Collections.Generic;
+using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 namespace CertificateCommon
 {
-    public class CARootWithouthPrivateKey(): Exception("CA Root withouth Private Key")
+    public class CARootNotFoundException() : Exception("NO CA Root")
+    {
+
+    }
+    public class CARootWithouthPrivateKeyException(): Exception("CA Root withouth Private Key")
     {
 
     }
@@ -19,21 +25,23 @@ namespace CertificateCommon
         public Serilog.ILogger? Logger { get; set; }
         //public byte[] LastSerialNumber { get; set; } = new byte[] { 0, 0, 0, 0 };
         public Int32 LastSerialNumber { get; private set; }
-        string? _dir { get; init; } = "";
+        string _dir { get; init; } = "Output";
 
         public CertificationManager(IConfiguration configuration, Serilog.ILogger logger)
         {
             Logger = logger;
             CARootThumbprint = configuration.GetSection("CertificationManager").GetSection("CARootThumbPrint").Value;
-            CARoot = Get(CARootThumbprint, X509FindType.FindByThumbprint, StoreName.My, StoreLocation.CurrentUser);
+            CARoot = Get(CARootThumbprint, X509FindType.FindByThumbprint, StoreName.Root, StoreLocation.CurrentUser);
             var outputData = configuration.GetSection("CertificationManager").GetSection("Output").Value;
             LastSerialNumber = 0;
 
             if(!string.IsNullOrEmpty(outputData) && !Directory.Exists(outputData))
             {
                 Directory.CreateDirectory(outputData);
-                _dir = outputData;
-            }         
+
+            }
+
+            _dir = outputData;
         }
 
         public CertificationManager(string caRootThumbprint, int lastSerialNumber)
@@ -68,70 +76,135 @@ namespace CertificateCommon
             }
         }
 
-        public void CreatingPFX_CRT(string serverAddress, string company, string exportPWD, DateTimeOffset expiring, string pfxName = "Certificate.pfx", string certName = "Certificate.crt", bool withDNS = false, string[]? DNSs = null)
+        public CertficateFileInfo ExtractRoot(string path)
         {
+            if(CARoot is null)
+                throw new CARootNotFoundException();
+
+            string certFileName = Path.Join(path, "Root.crt");
+            File.WriteAllBytes(certFileName, CARoot.Export(X509ContentType.Cert));
+
+            return new CertficateFileInfo(certFileName, CARoot);
+
+        }
+
+        public class CertficateFileInfo
+        {
+            public string? Name { get; init; }
+            public DateTime? Created { get; init; }
+            public Int64? Size { get; init; }
+
+            public string? Subject { get; init; }
+            public string? SerialNumber { get; init; }
+            public string? ThumbPrint { get; init; }
+            public bool HasPrivateKey { get; init; }
+            public CertficateFileInfo(string file, X509Certificate2 cert)
+            {
+                var fileInfo = new FileInfo(file);
+                Name = fileInfo.FullName;
+                Created = fileInfo.CreationTime;
+                Size = fileInfo.Length;
+
+                Subject = cert.Subject;
+                SerialNumber = cert.SerialNumber;
+                ThumbPrint = cert.Thumbprint;
+                HasPrivateKey = cert.HasPrivateKey;
+
+            }
+        }
+
+        public List<CertficateFileInfo> CreatingPFX_CRT(string commonName, string serverAddress, string company, string exportPWD, DateTimeOffset expiring, string solutionFolder, string pfxName = "Certificate.pfx", string certName = "Certificate.crt")
+        {
+            List<CertficateFileInfo> fileInfo = new List<CertficateFileInfo>();
             using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256); // Uso di ECDsa come da te suggerito
 
-            X509Certificate2? x509Son = CreateCASon(serverAddress, company, serverKey, expiring);
+            if(CARoot is null)
+            {
+                throw new CARootNotFoundException();
+            }
+
+            X509Certificate2? x509Son = CreateCASon(commonName, serverAddress, company, serverKey, expiring);
 
             if(x509Son is null)
             {
                 Logger?.Warning("The certificate creation failed");
-                return;
+                return new List<CertficateFileInfo>();
+            }
+            else
+            {
+                Logger?.Information($"Created: {x509Son}");
             }
 
+            string path = Path.Combine(_dir, solutionFolder);
 
+            if(!Directory.Exists(path))
+            {
+                Directory.CreateDirectory(path);
+            }
 
             var serverPfx = x509Son!.CopyWithPrivateKey(serverKey);
             if(!string.IsNullOrEmpty(exportPWD) && serverPfx is not null)
             {
-                string pfxFileName = Path.Join(_dir, pfxName);
-
+                string pfxFileName = Path.Join(path, pfxName);
                 File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, exportPWD));
+
+                fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son));
             }
 
-            string certFileName = Path.Join(_dir, certName);
-            File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));         
+            string certFileName = Path.Join(path, certName);
+            File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));
+            fileInfo.Add(new CertficateFileInfo(certFileName, x509Son));
 
+            fileInfo.Add(ExtractRoot(path));
 
+            return fileInfo;
         }
 
-        public X509Certificate2? CreateCASon(string serverAddress, string company, ECDsa privateKey, DateTimeOffset expiring, bool withDNS = false, string[]? DNSs = null)
+        public X509Certificate2? CreateCASon(string commonName, string serverAddress, string company, ECDsa privateKey, DateTimeOffset expiring, string friendlyName = "")
         {
             if(!CARoot?.HasPrivateKey ?? false)
             {
-                throw new CARootWithouthPrivateKey();
+                throw new CARootWithouthPrivateKeyException();
             }
 
+            var subject = new X500DistinguishedName(
+                $"CN={commonName}, O={company}, L=Pisa, S=PI, C=IT");
+
             var serverRequest = new CertificateRequest(
-                $"CN={serverAddress} O={company}",
+                subject,
                 privateKey,
-                HashAlgorithmName.SHA256);
+                HashAlgorithmName.SHA384);
 
             // Aggiungi le estensioni necessarie per un certificato server
             serverRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
             serverRequest.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
             serverRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") }, false));
-            var sanBuilder = new SubjectAlternativeNameBuilder();
+            //var sanBuilder = new SubjectAlternativeNameBuilder();
 
-            if(withDNS && DNSs is not null)
-            {
-                sanBuilder.AddDnsName("mioserver.local");
-                sanBuilder.AddDnsName("localhost");
-            }
+            var san = new SubjectAlternativeNameBuilder();
+            san.AddIpAddress(ipAddress: IPAddress.Parse(serverAddress));
+            san.Build();
 
-            serverRequest.CertificateExtensions.Add(sanBuilder.Build());
+            //if(withDNS && DNSs is not null)
+            //{
+            //    sanBuilder.AddDnsName("mioserver.local");
+            //    sanBuilder.AddDnsName("localhost");
+            //}
+
+            serverRequest.CertificateExtensions.Add(san.Build());
 
             byte[] serialNumber = BitConverter.GetBytes(++LastSerialNumber);
 
             if(CARoot is not null)
             {
-                return serverRequest.Create(CARoot, DateTimeOffset.Now.AddDays(-1), expiring, serialNumber);
+                var cert = serverRequest.Create(CARoot, DateTimeOffset.Now.AddDays(-1), expiring, serialNumber);
+                cert.FriendlyName = friendlyName;
+                return cert;
             }
             else
             {
                 Logger?.Warning("NO CA Root well configured");
-                return null;
+                throw new CARootNotFoundException();
             }
         }
 

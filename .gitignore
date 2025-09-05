@@ -13,3 +13,6 @@
 *.crt
 *.pfx
 /CertificateManager/LOG
+CACertificate.ps1
+CertificateManager/appsettings.Development.json
+CertificateManager/appsettings.json

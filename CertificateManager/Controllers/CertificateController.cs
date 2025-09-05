@@ -14,12 +14,17 @@ namespace CertificateManager.Controllers
         }
 
         [HttpGet("Make")]
-        public IActionResult GetCertificates(string address, string company)
+        public IActionResult GetCertificates(string cn, string address, string company, string solutionName)
         {
             try
             {
-                _certificationManager?.CreatingPFX_CRT(address, company, ".1q2w3e!", DateTimeOffset.Now + TimeSpan.FromDays(3650));
-                return Ok();
+                var result = _certificationManager?.CreatingPFX_CRT("server1", 
+                    serverAddress: address,
+                    company: company, 
+                    exportPWD: ".1q2w3e!",
+                    expiring: DateTimeOffset.Now + TimeSpan.FromDays(3650),
+                    solutionFolder: solutionName);
+                return Ok(result);
             }
             catch
             {
