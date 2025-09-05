@@ -20,6 +20,11 @@ namespace CertificateManager.src
             _logger?.Information($"Working in {workingPath}");
             _logger?.Information("Starting the Application");
 
+            if((_manager?.CARoot is null))
+            {
+                throw new CARootNotFoundException();
+            }
+
             return Task.CompletedTask;
         }
 
