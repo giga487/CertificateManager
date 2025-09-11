@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using Microsoft.JSInterop;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,6 +31,60 @@ namespace CommonBlazor.HttpClient
             return _httpFactory?.CreateClient(ClientName) ?? null;
         }
 
+        public async Task Download(string address, IJSRuntime runtime)
+        {
+
+        //< script >
+        //    window.downloadFileFromStream = async (fileName, contentStreamReference) => {
+        //        const arrayBuffer = await contentStreamReference.arrayBuffer();
+        //        const blob = new Blob([arrayBuffer]);
+        //        const url = URL.createObjectURL(blob);
+        //        const anchorElement = document.createElement('a');
+        //        anchorElement.href = url;
+        //        anchorElement.download = fileName ?? '';
+        //        anchorElement.click();
+        //        anchorElement.remove();
+        //        URL.revokeObjectURL(url);
+        //    };
+        //</ script >
+
+            await GetStreamAsync(address, runtime);
+        }
+
+
+        public async Task GetStreamAsync(string address, IJSRuntime runtime)
+        {
+            var client = _httpFactory?.CreateClient(ClientName);
+
+            CancellationTokenSource source = new CancellationTokenSource();
+            if(client is not null)
+            {
+                try
+                {
+                    var response = await client.GetAsync(address);
+
+                    if(response.IsSuccessStatusCode)
+                    {
+                        var stream = await response.Content.ReadAsStreamAsync();
+                        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar ?? "downloaded_file";
+
+                        source.CancelAfter(TimeSpan.FromSeconds(60));
+
+                        await runtime.InvokeVoidAsync("downloadFileFromStream", fileName, stream);
+
+                    }
+                }
+                catch(Exception ex)
+                {
+                    _logger?.Error(ex.Message);
+                }
+            }
+
+            return;
+        }
+
+
+
         public async Task<T?> GetAsync<T>(string address)
         {
             var client = _httpFactory?.CreateClient(ClientName);
@@ -38,7 +93,7 @@ namespace CommonBlazor.HttpClient
             {
                 try
                 {
-                    var response = await client.GetAsync("/api/info/Logs");
+                    var response = await client.GetAsync(address);
 
                     if(response.IsSuccessStatusCode)
                     {

@@ -1,0 +1,190 @@
+﻿using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace CertificateManager.src
+{
+    public enum CertificateTypes
+    {
+        Default = 0,
+        CARootWithKey = 1,
+        PFX = 2,
+        CARootNoKey = 3,
+        CRT = 4,
+
+    }
+
+    public class CertificateDB
+    {
+        public DateTime Modified { get; set; } = DateTime.Now;
+        public List<Certificate> CertificatesDB { get; set; } = new List<Certificate>();
+        
+        public int? MaxId
+        {
+            get
+            {
+                if(CertificatesDB.Count == 0)
+                    return 0;
+
+                return CertificatesDB.Max(x => x.Id);   
+            }
+        }
+
+        public void Add(string solution, Certificate cert)
+        {
+            var found = CertificatesDB.Find(t => string.Compare(t.Solution, solution, true) == 0);
+
+            if(found != null)
+            {
+                CertificatesDB.Remove(found);
+            }
+
+            CertificatesDB.Add(cert);
+
+        }
+
+    }
+
+    public class Certificate
+    {
+        //public string? ServerAddress { get; init; }
+        public string? Password { get; init; }
+        public int? Id { get; init; }
+        //public string? Company { get; init; }
+        //public string? CN { get; init; }
+        public string? Solution { get; init; }
+        public string? PFXCertificate { get; init; }
+        public string? CRTCertificate { get; init; }
+        public DateTime Creation { get; init; } = DateTime.Now;
+        public string? RootThumbPrint { get; set; } = string.Empty;
+    }
+
+    public class CertificateComplete: Certificate
+    {
+
+        [JsonIgnore]
+        X509Certificate2 PFX { get; set; }
+        [JsonIgnore]
+        X509Certificate2 CRT { get; set; }
+
+
+        public void LoadCertificate()
+        {
+            CRT = new X509Certificate2(CRTCertificate);
+            PFX = new X509Certificate2(PFXCertificate, Password);
+        }
+    }
+
+    public class FileManagerCertificate
+    {
+        public string? _dbCertificates { get; init; }    
+        DirectoryInfo? _dir { get; init; }
+        Serilog.ILogger? _logger { get; init; }
+        public FileManagerCertificate(string jsonAddress, Serilog.ILogger? logger)
+        {
+            _logger = logger;
+
+            _dbCertificates = jsonAddress;
+            if(File.Exists(jsonAddress))
+            {
+
+                Load();
+            }
+            else
+            {
+                _lastDB = new CertificateDB();
+            }
+        }
+
+        CertificateDB? _lastDB { get; set; }
+        public CertificateDB? LastDB => _lastDB;
+
+        JsonSerializerOptions _options = new JsonSerializerOptions
+        {
+            WriteIndented = true
+        };
+
+        public Dictionary<CertificateTypes, string>? RetrieveCertificates(int id)
+        {
+            Dictionary<CertificateTypes, string> files = new Dictionary<CertificateTypes, string>();
+            var dataFound = _lastDB?.CertificatesDB.Find(t => t.Id == id);
+
+            if(dataFound is null)
+                return null;
+
+
+            if(!string.IsNullOrEmpty(dataFound.PFXCertificate))
+            {
+                files[CertificateTypes.PFX] = dataFound.PFXCertificate;// System.IO.File.OpenRead(dataFound.PFXCertificate);
+            }
+
+            if(!string.IsNullOrEmpty(dataFound.CRTCertificate))
+            {
+                files[CertificateTypes.CARootNoKey] = dataFound.CRTCertificate; // System.IO.File.OpenRead(dataFound.CRTCertificate);
+            }
+
+            return files;
+        }
+
+        public void Load()
+        {
+            if(!File.Exists(_dbCertificates))
+            {
+                _logger?.Information("No db data to load");
+                return;
+            }
+
+            try
+            {
+                var jsonString = File.ReadAllText(_dbCertificates);
+                _lastDB = JsonSerializer.Deserialize<CertificateDB>(jsonString, _options);
+
+                foreach(var cert in _lastDB?.CertificatesDB ?? new List<Certificate>())
+                {
+                    if(cert is CertificateComplete certCom)
+                    {
+                        certCom.LoadCertificate();
+                    }
+
+                }
+            }
+            catch(Exception ex)
+            {
+                _logger?.Warning($"Impossibile to load {_dbCertificates} -> {ex.Message}");
+            }
+
+        }
+
+        public void Add(string pfxFile, string crtRoot, string solution, string password, string rootThumbprint)
+        {
+
+            CertificateComplete crt = new CertificateComplete()
+            {
+                CRTCertificate = crtRoot,
+                PFXCertificate = pfxFile,
+                Solution = solution,
+                Password = password,
+                Id = _lastDB?.MaxId + 1,
+                RootThumbPrint = rootThumbprint
+            };
+
+            crt.LoadCertificate();
+
+            _lastDB?.Add(solution, crt);
+
+            Save();
+        }
+
+        public void Save()
+        {
+            if(string.IsNullOrEmpty(_dbCertificates))
+            {
+                return; 
+            }
+
+            var jsonString = JsonSerializer.Serialize(_lastDB, _options);
+            File.WriteAllText(_dbCertificates, jsonString);
+        }
+
+    }
+}

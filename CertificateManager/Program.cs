@@ -3,6 +3,7 @@ using CertificateManager.Components;
 using CertificateManager.src;
 using Common;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Serilog;
@@ -45,6 +46,10 @@ namespace CertificateManager
 
             builder.Services.AddHostedService<StartupClass>();
 
+            FileManagerCertificate manager = new FileManagerCertificate("OUTPUT/Certificates.Json", Logger);
+
+            builder.Services.AddSingleton(manager);
+            builder.Services.AddSingleton<CertificateDB>();
             builder.Services.AddSingleton<CertificateCommon.CertificationManager>();
 
             var app = builder.Build();

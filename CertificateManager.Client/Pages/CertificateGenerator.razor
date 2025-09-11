@@ -1,0 +1,45 @@
+﻿@page "/certificate"
+
+@inherits Page<CertificateGeneratorMV>
+
+<PageTitle>Certificate Generator</PageTitle>
+
+<h2>Certificates List</h2>
+
+<FluentDataGrid Items="@ViewModel?.Certificates?.CertificatesDB.AsQueryable()">
+    <PropertyColumn Property="@(p => p.Id)" Sortable="true" Width="15%" />
+    <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="10%" />    
+        <PropertyColumn Property="@(p => p.Solution)" />
+    <PropertyColumn Property="@(p => p.CRTCertificate)" Sortable="true" Width="25%" />
+    <PropertyColumn Property="@(p => p.PFXCertificate)"/>
+
+    <TemplateColumn Title="PFX">
+        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(context.Id))">Download</FluentButton>
+    </TemplateColumn>
+    <TemplateColumn Title="CA Root">
+        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
+    </TemplateColumn>
+</FluentDataGrid>
+
+<script>
+    window.downloadFileFromStream = async (fileName, contentStreamReference) => {
+        const arrayBuffer = await contentStreamReference.arrayBuffer();
+        const blob = new Blob([arrayBuffer]);
+        const url = URL.createObjectURL(blob);
+        const anchorElement = document.createElement('a');
+        anchorElement.href = url;
+        anchorElement.download = fileName ?? '';
+        anchorElement.click();
+        anchorElement.remove();
+        URL.revokeObjectURL(url);
+    };
+</script>
+
+@code {
+
+    protected override Task OnInitializedAsync()
+    {
+        return base.OnInitializedAsync();
+    }
+
+}

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using CertificateManager.src;
+using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using System.Net;
 using System.Security.Cryptography;
@@ -26,14 +27,17 @@ namespace CertificateCommon
         //public byte[] LastSerialNumber { get; set; } = new byte[] { 0, 0, 0, 0 };
         public Int32 LastSerialNumber { get; private set; }
         string _dir { get; init; } = "Output";
+        public FileManagerCertificate? FileManager { get; init; }
 
-        public CertificationManager(IConfiguration configuration, Serilog.ILogger logger)
+        public CertificationManager(IConfiguration configuration, Serilog.ILogger logger, FileManagerCertificate fileManager)
         {
             Logger = logger;
             CARootThumbprint = configuration.GetSection("CertificationManager").GetSection("CARootThumbPrint").Value;
             CARoot = Get(CARootThumbprint, X509FindType.FindByThumbprint, StoreName.Root, StoreLocation.CurrentUser);
             var outputData = configuration.GetSection("CertificationManager").GetSection("Output").Value;
             LastSerialNumber = 0;
+
+            FileManager = fileManager;
 
             if(!string.IsNullOrEmpty(outputData) && !Directory.Exists(outputData))
             {
@@ -76,12 +80,12 @@ namespace CertificateCommon
             }
         }
 
-        public CertficateFileInfo ExtractRoot(string path)
+        public CertficateFileInfo ExtractRoot(string certFileName)
         {
             if(CARoot is null)
                 throw new CARootNotFoundException();
 
-            string certFileName = Path.Join(path, "Root.crt");
+
             File.WriteAllBytes(certFileName, CARoot.Export(X509ContentType.Cert));
 
             return new CertficateFileInfo(certFileName, CARoot);
@@ -147,15 +151,17 @@ namespace CertificateCommon
             {
                 string pfxFileName = Path.Join(path, pfxName);
                 File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, exportPWD));
-
                 fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son));
+
+                string certFileName = Path.Join(path, certName);
+                File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));
+                fileInfo.Add(new CertficateFileInfo(certFileName, x509Son));
+
+                string certFileNameRoot = Path.Join(path, "Root.crt");
+                fileInfo.Add(ExtractRoot(certFileNameRoot));
+
+                FileManager?.Add(pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: solutionFolder, password: exportPWD, rootThumbprint: CARoot.Thumbprint);
             }
-
-            string certFileName = Path.Join(path, certName);
-            File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));
-            fileInfo.Add(new CertficateFileInfo(certFileName, x509Son));
-
-            fileInfo.Add(ExtractRoot(path));
 
             return fileInfo;
         }
@@ -197,7 +203,7 @@ namespace CertificateCommon
 
             if(CARoot is not null)
             {
-                var cert = serverRequest.Create(CARoot, DateTimeOffset.Now.AddDays(-1), expiring, serialNumber);
+                var cert = serverRequest.Create(CARoot, DateTimeOffset.Now.AddDays(-1), CARoot.NotAfter, serialNumber);
                 cert.FriendlyName = friendlyName;
                 return cert;
             }
