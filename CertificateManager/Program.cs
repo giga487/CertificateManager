@@ -1,4 +1,6 @@
+using CertificateManager.Client;
 using CertificateManager.Client.Pages;
+using CertificateManager.Client.src;
 using CertificateManager.Components;
 using CertificateManager.src;
 using Common;
@@ -48,9 +50,12 @@ namespace CertificateManager
 
             FileManagerCertificate manager = new FileManagerCertificate("OUTPUT/Certificates.Json", Logger);
 
+            builder.Services.AddSingleton<AppData>();
             builder.Services.AddSingleton(manager);
             builder.Services.AddSingleton<CertificateDB>();
             builder.Services.AddSingleton<CertificateCommon.CertificationManager>();
+
+            builder.Services.AddHttpContextAccessor();
 
             var app = builder.Build();
 

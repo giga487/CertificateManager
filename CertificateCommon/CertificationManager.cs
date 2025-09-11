@@ -42,7 +42,6 @@ namespace CertificateCommon
             if(!string.IsNullOrEmpty(outputData) && !Directory.Exists(outputData))
             {
                 Directory.CreateDirectory(outputData);
-
             }
 
             _dir = outputData;
@@ -85,8 +84,16 @@ namespace CertificateCommon
             if(CARoot is null)
                 throw new CARootNotFoundException();
 
-
             File.WriteAllBytes(certFileName, CARoot.Export(X509ContentType.Cert));
+
+            return new CertficateFileInfo(certFileName, CARoot);
+
+        }
+
+        public CertficateFileInfo GetInstallableRoot(string certFileName, string password)
+        {
+            if(CARoot is null)
+                throw new CARootNotFoundException();
 
             return new CertficateFileInfo(certFileName, CARoot);
 
@@ -117,7 +124,7 @@ namespace CertificateCommon
             }
         }
 
-        public List<CertficateFileInfo> CreatingPFX_CRT(string commonName, string serverAddress, string company, string exportPWD, DateTimeOffset expiring, string solutionFolder, string pfxName = "Certificate.pfx", string certName = "Certificate.crt")
+        public List<CertficateFileInfo> CreatingPFX_CRT(string commonName, string serverAddress, string company, string exportPWD, DateTimeOffset expiring, string solutionFolder, string pfxName = "Certificate.pfx", string certName = "Certificate.crt", params string[] serverDNS)
         {
             List<CertficateFileInfo> fileInfo = new List<CertficateFileInfo>();
             using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256); // Uso di ECDsa come da te suggerito
@@ -127,7 +134,7 @@ namespace CertificateCommon
                 throw new CARootNotFoundException();
             }
 
-            X509Certificate2? x509Son = CreateCASon(commonName, serverAddress, company, serverKey, expiring);
+            X509Certificate2? x509Son = CreateCASon(commonName, serverAddress, company, serverKey, expiring, serverDNS: serverDNS);
 
             if(x509Son is null)
             {
@@ -149,25 +156,63 @@ namespace CertificateCommon
             var serverPfx = x509Son!.CopyWithPrivateKey(serverKey);
             if(!string.IsNullOrEmpty(exportPWD) && serverPfx is not null)
             {
-                string pfxFileName = Path.Join(path, pfxName);
-                File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, exportPWD));
-                fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son));
+                try
+                {
+                    string pfxFileName = Path.Join(path, pfxName);
+                    File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, exportPWD));
+                    fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son));
 
-                string certFileName = Path.Join(path, certName);
-                File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));
-                fileInfo.Add(new CertficateFileInfo(certFileName, x509Son));
+                    string certFileName = Path.Join(path, certName);
+                    File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));
+                    fileInfo.Add(new CertficateFileInfo(certFileName, x509Son));
 
-                string certFileNameRoot = Path.Join(path, "Root.crt");
-                fileInfo.Add(ExtractRoot(certFileNameRoot));
+                    string certFileNameRoot = Path.Join(path, "Root.crt");
+                    fileInfo.Add(ExtractRoot(certFileNameRoot));
 
-                FileManager?.Add(pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: solutionFolder, password: exportPWD, rootThumbprint: CARoot.Thumbprint);
+                    FileManager?.Add(pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: solutionFolder, password: exportPWD, rootThumbprint: CARoot.Thumbprint, address: serverAddress, dns: serverDNS);
+
+                }
+                catch(Exception ex)
+                {
+                    Logger?.Warning($"Creating files making error: {ex.Message}");
+                    throw;
+                }
             }
 
             return fileInfo;
         }
 
-        public X509Certificate2? CreateCASon(string commonName, string serverAddress, string company, ECDsa privateKey, DateTimeOffset expiring, string friendlyName = "")
+        public IPAddress ManageServerAddress(string serverAddress)
         {
+            if(string.Compare(serverAddress, "localhost", true) == 0)
+            {
+                return IPAddress.Loopback;
+            }
+
+            if(string.Compare(serverAddress, "*", true) == 0)
+            {
+                return IPAddress.Any;
+            }
+
+            try
+            {
+                return IPAddress.Parse(serverAddress);
+            }
+            catch(Exception ex)
+            {
+                Logger?.Error("Managing ip address error");
+                return IPAddress.Any;
+            }
+        }
+
+        public X509Certificate2? CreateCASon(string commonName, string serverAddress, string company, ECDsa privateKey, DateTimeOffset expiring, string friendlyName = "", params string[] serverDNS)
+        {
+
+            if(CARoot is null)
+            {
+                throw new NotCARootConfiguredThumbprintException();
+            }
+
             if(!CARoot?.HasPrivateKey ?? false)
             {
                 throw new CARootWithouthPrivateKeyException();
@@ -188,7 +233,16 @@ namespace CertificateCommon
             //var sanBuilder = new SubjectAlternativeNameBuilder();
 
             var san = new SubjectAlternativeNameBuilder();
-            san.AddIpAddress(ipAddress: IPAddress.Parse(serverAddress));
+
+            var address = ManageServerAddress(serverAddress);
+
+            san.AddIpAddress(ipAddress: address);
+
+            foreach(var serverN in serverDNS)
+            {
+                san.AddDnsName(serverN);
+            }
+
             san.Build();
 
             //if(withDNS && DNSs is not null)

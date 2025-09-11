@@ -30,6 +30,16 @@ namespace CertificateManager.src
             }
         }
 
+        public bool Get(int id, out Certificate? found)
+        {
+            found = CertificatesDB.Find(t => t.Id == id);
+
+            if(found is not null)
+                return true;
+
+            return false;
+        }
+
         public void Add(string solution, Certificate cert)
         {
             var found = CertificatesDB.Find(t => string.Compare(t.Solution, solution, true) == 0);
@@ -57,15 +67,17 @@ namespace CertificateManager.src
         public string? CRTCertificate { get; init; }
         public DateTime Creation { get; init; } = DateTime.Now;
         public string? RootThumbPrint { get; set; } = string.Empty;
+        public string? Address { get; init; }
+        public string[]? DNS { get; init; }
     }
 
     public class CertificateComplete: Certificate
     {
 
         [JsonIgnore]
-        X509Certificate2 PFX { get; set; }
+        public X509Certificate2 PFX { get; set; }
         [JsonIgnore]
-        X509Certificate2 CRT { get; set; }
+        public X509Certificate2 CRT { get; set; }
 
 
         public void LoadCertificate()
@@ -87,17 +99,16 @@ namespace CertificateManager.src
             _dbCertificates = jsonAddress;
             if(File.Exists(jsonAddress))
             {
-
                 Load();
             }
             else
             {
-                _lastDB = new CertificateDB();
+                _lastJSonMemory = new CertificateDB();
             }
         }
 
-        CertificateDB? _lastDB { get; set; }
-        public CertificateDB? LastDB => _lastDB;
+        CertificateDB? _lastJSonMemory { get; set; }
+        public CertificateDB? JSONMemory => _lastJSonMemory;
 
         JsonSerializerOptions _options = new JsonSerializerOptions
         {
@@ -107,7 +118,7 @@ namespace CertificateManager.src
         public Dictionary<CertificateTypes, string>? RetrieveCertificates(int id)
         {
             Dictionary<CertificateTypes, string> files = new Dictionary<CertificateTypes, string>();
-            var dataFound = _lastDB?.CertificatesDB.Find(t => t.Id == id);
+            var dataFound = _lastJSonMemory?.CertificatesDB.Find(t => t.Id == id);
 
             if(dataFound is null)
                 return null;
@@ -137,9 +148,9 @@ namespace CertificateManager.src
             try
             {
                 var jsonString = File.ReadAllText(_dbCertificates);
-                _lastDB = JsonSerializer.Deserialize<CertificateDB>(jsonString, _options);
+                _lastJSonMemory = JsonSerializer.Deserialize<CertificateDB>(jsonString, _options);
 
-                foreach(var cert in _lastDB?.CertificatesDB ?? new List<Certificate>())
+                foreach(var cert in _lastJSonMemory?.CertificatesDB ?? new List<Certificate>())
                 {
                     if(cert is CertificateComplete certCom)
                     {
@@ -155,7 +166,7 @@ namespace CertificateManager.src
 
         }
 
-        public void Add(string pfxFile, string crtRoot, string solution, string password, string rootThumbprint)
+        public void Add(string pfxFile, string crtRoot, string solution, string password, string rootThumbprint, string address, string[] dns)
         {
 
             CertificateComplete crt = new CertificateComplete()
@@ -164,13 +175,15 @@ namespace CertificateManager.src
                 PFXCertificate = pfxFile,
                 Solution = solution,
                 Password = password,
-                Id = _lastDB?.MaxId + 1,
-                RootThumbPrint = rootThumbprint
+                Id = _lastJSonMemory?.MaxId + 1,
+                RootThumbPrint = rootThumbprint,
+                Address = address,
+                DNS = dns
             };
 
             crt.LoadCertificate();
 
-            _lastDB?.Add(solution, crt);
+            _lastJSonMemory?.Add(solution, crt);
 
             Save();
         }
@@ -182,7 +195,7 @@ namespace CertificateManager.src
                 return; 
             }
 
-            var jsonString = JsonSerializer.Serialize(_lastDB, _options);
+            var jsonString = JsonSerializer.Serialize(_lastJSonMemory, _options);
             File.WriteAllText(_dbCertificates, jsonString);
         }
 

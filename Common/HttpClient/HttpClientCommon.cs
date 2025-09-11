@@ -31,7 +31,7 @@ namespace CommonBlazor.HttpClient
             return _httpFactory?.CreateClient(ClientName) ?? null;
         }
 
-        public async Task Download(string address, IJSRuntime runtime)
+        public async Task Download(string address, IJSRuntime runtime, string prefix)
         {
 
         //< script >
@@ -48,11 +48,11 @@ namespace CommonBlazor.HttpClient
         //    };
         //</ script >
 
-            await GetStreamAsync(address, runtime);
+            await GetStreamAsync(address, runtime, prefix);
         }
 
 
-        public async Task GetStreamAsync(string address, IJSRuntime runtime)
+        public async Task GetStreamAsync(string address, IJSRuntime runtime, string beforeName = "")
         {
             var client = _httpFactory?.CreateClient(ClientName);
 
@@ -66,11 +66,16 @@ namespace CommonBlazor.HttpClient
                     if(response.IsSuccessStatusCode)
                     {
                         var stream = await response.Content.ReadAsStreamAsync();
-                        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar ?? "downloaded_file";
+                        var fileName = beforeName + response.Content.Headers.ContentDisposition?.FileNameStar ?? "downloaded_file";
 
-                        source.CancelAfter(TimeSpan.FromSeconds(60));
+                        using var networkStream = await response.Content.ReadAsStreamAsync();
+                        var memoryStream = new MemoryStream();
+                        await networkStream.CopyToAsync(memoryStream);
 
-                        await runtime.InvokeVoidAsync("downloadFileFromStream", fileName, stream);
+                        memoryStream.Position = 0;
+                        using var streamRef = new DotNetStreamReference(stream: memoryStream);
+
+                        await runtime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
 
                     }
                 }

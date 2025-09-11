@@ -1,0 +1,45 @@
+﻿@page "/helper"
+@using CertificateManager.Client.src.Models
+
+@inherits Page<HelperMV>
+
+<PageTitle>Helper</PageTitle>
+
+<h2>Certificates List</h2>
+
+<pre>
+You can go only on the certificate page
+For make another Certificate, you should only use this http get:
+
+<span style="color: red;">$V1</span> = address
+<span style="color: red;">$V2</span> = company
+<span style="color: red;">$V3</span> = solution name, is the "database" folder
+<span style="color: red;">$V4</span> = Common Name
+<span style="color: red;">$V5</span> = pfx password
+
+@((MarkupString)Make)
+
+You can add the DNS too using another rest http get 
+<span style="color: red;">$V1</span> = address
+<span style="color: red;">$V2</span> = company
+<span style="color: red;">$V3</span> = solution name, is the "database" folder
+<span style="color: red;">$V4</span> = Common Name
+<span style="color: red;">$V5</span> = pfx password
+
+you should add in the message body something like ["appCore","htcUnknown"] (string[])
+
+@((MarkupString)MakeDNS)
+</pre>
+
+@code {
+    string? Make { get; set; } = string.Empty;
+    string? MakeDNS { get; set; } = string.Empty;
+    protected async override Task OnInitializedAsync()
+    {
+        Make = this.ViewModel.Host + "api/Certificate/Make?address=<span style=\'color: red;\'>$V1</span>&company=<span style=\'color: red;\'>$V2</span>&solutionname=<span style=\'color: red;\'>$V3</span>&cn=<span style=\'color: red;\'>$V4</span>&password=<span style=\'color: red;\'>$V5</span>'";
+        MakeDNS = this.ViewModel.Host + "api/Certificate/MakeDNS?address=<span style=\'color: red;\'>$V1</span>&company=<span style=\'color: red;\'>$V2</span>&solutionname=<span style=\'color: red;\'>$V3</span>&cn=<span style=\'color: red;\'>$V4</span>&password=<span style=\'color: red;\'>$V5</span>'";
+        // await JSRuntime.InvokeVoidAsync('mostraAlert", "Ciao da Blazor C#!");
+        base.OnInitializedAsync();
+    }
+
+}

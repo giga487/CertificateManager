@@ -5,7 +5,7 @@ using Microsoft.JSInterop;
 using Microsoft.VisualBasic;
 using System.ComponentModel;
 
-namespace CertificateManager.Client.src
+namespace CertificateManager.Client.src.Models
 {
     public class CertificateGeneratorMV : IViewModel, IAsyncDisposable
     {
@@ -46,7 +46,7 @@ namespace CertificateManager.Client.src
                             OnStateChange("Info received");
                         }
 
-                        await Task.Delay(60000);
+                        await Task.Delay(6000);
                     }
                 }
                 catch(OperationCanceledException ex)
@@ -81,7 +81,12 @@ namespace CertificateManager.Client.src
 
             try
             {
-                await _factory?.Download($"api/Certificate/downloadPFX?id={id}", runtime: _jsRuntime);
+                if(Certificates?.Get(id ?? 0, out var found) ?? false)
+                {
+                    await _factory?.Download($"api/Certificate/downloadPFX?id={id}", runtime: _jsRuntime, prefix: found.Solution);
+                }
+
+
             }
             catch(OperationCanceledException ex)
             {
@@ -94,7 +99,10 @@ namespace CertificateManager.Client.src
             _logger?.Information($"CRT: {id}");
             try
             {
-                await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime);
+                if(Certificates?.Get(id ?? 0, out var found) ?? false)
+                {
+                    await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime, prefix: found.Solution);
+                }
             }
             catch(OperationCanceledException ex)
             {

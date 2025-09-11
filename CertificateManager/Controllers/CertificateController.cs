@@ -10,9 +10,11 @@ namespace CertificateManager.Controllers
     public class CertificateController : ControllerBase
     {
         private CertificateCommon.CertificationManager? _certificationManager { get; init; }
-        public CertificateController(CertificateCommon.CertificationManager certificationManager)
+        private Serilog.ILogger? _logger { get; init; }
+        public CertificateController(CertificateCommon.CertificationManager certificationManager, Serilog.ILogger? logger)
         {
             _certificationManager = certificationManager;
+            _logger = logger;
         }
 
         [HttpGet("Make")]
@@ -20,25 +22,50 @@ namespace CertificateManager.Controllers
         {
             try
             {
-                var result = _certificationManager?.CreatingPFX_CRT("server1", 
+                var result = _certificationManager?.CreatingPFX_CRT("server1",
                     serverAddress: address,
-                    company: company, 
+                    company: company,
                     exportPWD: password,
                     expiring: DateTimeOffset.Now + TimeSpan.FromDays(3650),
                     solutionFolder: solutionName);
 
                 return Ok(result);
             }
-            catch
+            catch(Exception ex)
             {
-                return BadRequest();
+                _logger?.Warning($"Error making certificate: {ex.Message}");
+                return BadRequest(ex.Message);
+            }
+        }
+
+
+
+        [HttpGet("MakeDNS")]
+        public IActionResult GetCertificatesWithDNS(string cn, string address, string company, string solutionName, string password, [FromBody] string[] dnsName)
+        {
+            try
+            {
+                var result = _certificationManager?.CreatingPFX_CRT("server1",
+                    serverAddress: address,
+                    company: company,
+                    exportPWD: password,
+                    expiring: DateTimeOffset.Now + TimeSpan.FromDays(3650),
+                    solutionFolder: solutionName,
+                    serverDNS: dnsName);
+
+                return Ok(result);
+            }
+            catch(Exception ex)
+            {
+                _logger?.Warning($"Error making certificate with dns: {ex.Message}");
+                return BadRequest(ex.Message);
             }
         }
 
         [HttpGet("Info")]
         public IActionResult Info()
         { 
-            return Ok(_certificationManager?.FileManager?.LastDB);
+            return Ok(_certificationManager?.FileManager?.JSONMemory);
         }
 
 

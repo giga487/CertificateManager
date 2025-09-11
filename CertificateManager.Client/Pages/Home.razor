@@ -1,9 +1,15 @@
 ﻿@page "/"
-
+@* @inject AppData _uri *@
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Certificate Manager Homepage</h1>
 
-Welcome to your new Certification Manager app
+<pre>
+Welcome to your new Certification Manager app, no braille ascii art, for now
+The GUI is working in progress (WIP)
+</pre>
 
-The GUI is completely useless (WIP)
+
+@code {
+    public string Url => "TEST";// _uri.GetBaseUrl();// _uri.BaseUrl.AbsoluteUri;
+}

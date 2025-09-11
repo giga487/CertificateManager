@@ -1,4 +1,6 @@
 ﻿@page "/certificate"
+@using CertificateManager.Client.src.Models
+@inject IJSRuntime JSRuntime
 
 @inherits Page<CertificateGeneratorMV>
 
@@ -7,12 +9,14 @@
 <h2>Certificates List</h2>
 
 <FluentDataGrid Items="@ViewModel?.Certificates?.CertificatesDB.AsQueryable()">
-    <PropertyColumn Property="@(p => p.Id)" Sortable="true" Width="15%" />
-    <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="10%" />    
-        <PropertyColumn Property="@(p => p.Solution)" />
-    <PropertyColumn Property="@(p => p.CRTCertificate)" Sortable="true" Width="25%" />
-    <PropertyColumn Property="@(p => p.PFXCertificate)"/>
-
+    <PropertyColumn Property="@(p => p.Id)" Sortable="true" Width="5%" />
+    <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="15%" />    
+    <PropertyColumn Property="@(p => p.Solution)" />
+    @* <PropertyColumn Property="@(p => p.CRTCertificate)" Sortable="true" Width="15%" />
+    <PropertyColumn Property="@(p => p.PFXCertificate)" Width="15%" /> *@
+    <PropertyColumn Property="@(p => p.Password)" Width="15%" />
+    <PropertyColumn Title = "DNS"   Property="@(p => string.Join(", ", p.DNS))" />
+    <PropertyColumn Property="@(p => p.Address)" />
     <TemplateColumn Title="PFX">
         <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(context.Id))">Download</FluentButton>
     </TemplateColumn>
@@ -21,25 +25,15 @@
     </TemplateColumn>
 </FluentDataGrid>
 
-<script>
-    window.downloadFileFromStream = async (fileName, contentStreamReference) => {
-        const arrayBuffer = await contentStreamReference.arrayBuffer();
-        const blob = new Blob([arrayBuffer]);
-        const url = URL.createObjectURL(blob);
-        const anchorElement = document.createElement('a');
-        anchorElement.href = url;
-        anchorElement.download = fileName ?? '';
-        anchorElement.click();
-        anchorElement.remove();
-        URL.revokeObjectURL(url);
-    };
-</script>
+
 
 @code {
 
-    protected override Task OnInitializedAsync()
+
+    protected async override Task OnInitializedAsync()
     {
-        return base.OnInitializedAsync();
+        // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
+        base.OnInitializedAsync();
     }
 
 }
