@@ -257,9 +257,21 @@ namespace CertificateCommon
 
             if(CARoot is not null)
             {
-                var cert = serverRequest.Create(CARoot, DateTimeOffset.Now.AddDays(-1), CARoot.NotAfter, serialNumber);
-                cert.FriendlyName = friendlyName;
-                return cert;
+                try
+                {
+                    var cert = serverRequest.Create(CARoot, DateTimeOffset.Now.AddDays(-1), CARoot.NotAfter, serialNumber);
+                    cert.FriendlyName = friendlyName;
+                    return cert;
+                }
+                catch(Exception ex)
+                {
+                    Logger?.Error($"NO CA Root well configured: {ex.Message}");
+                    throw new CARootNotFoundException();
+                }
+                finally
+                {
+
+                }
             }
             else
             {
