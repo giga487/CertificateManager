@@ -1,0 +1,39 @@
+﻿@page "/certificate"
+@using CertificateManager.Client.src.Models
+@inject IJSRuntime JSRuntime
+
+@inherits Page<CertificateGeneratorMV>
+
+<PageTitle>Certificate Generator</PageTitle>
+
+<h2>Certificates List</h2>
+
+<FluentDataGrid Items="@ViewModel?.Certificates?.CertificatesDB.AsQueryable()">
+    <PropertyColumn Property="@(p => p.Id)" Sortable="true" Width="5%" />
+    <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="15%" />    
+    <PropertyColumn Property="@(p => p.Solution)" />
+    @* <PropertyColumn Property="@(p => p.CRTCertificate)" Sortable="true" Width="15%" />
+    <PropertyColumn Property="@(p => p.PFXCertificate)" Width="15%" /> *@
+    <PropertyColumn Property="@(p => p.Password)" Width="15%" />
+    <PropertyColumn Title = "DNS"   Property="@(p => string.Join(", ", p.DNS))" />
+    <PropertyColumn Property="@(p => p.Address)" />
+    <TemplateColumn Title="PFX">
+        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(context.Id))">Download</FluentButton>
+    </TemplateColumn>
+    <TemplateColumn Title="CA Root">
+        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
+    </TemplateColumn>
+</FluentDataGrid>
+
+
+
+@code {
+
+
+    protected async override Task OnInitializedAsync()
+    {
+        // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
+        base.OnInitializedAsync();
+    }
+
+}

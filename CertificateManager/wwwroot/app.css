@@ -188,4 +188,13 @@ code {
         left: 20px;
         right: unset;
     }
+
+    .pre-formatted-text {
+        background-color: #fff;
+        padding: 1.5rem;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
 }

@@ -109,6 +109,12 @@ namespace CertificateCommon
             public string? SerialNumber { get; init; }
             public string? ThumbPrint { get; init; }
             public bool HasPrivateKey { get; init; }
+
+            public CertficateFileInfo()
+            {
+
+            }
+
             public CertficateFileInfo(string file, X509Certificate2 cert)
             {
                 var fileInfo = new FileInfo(file);

@@ -1,39 +1,89 @@
-﻿@page "/certificate"
+﻿@page "/certificateGenerator"
 @using CertificateManager.Client.src.Models
 @inject IJSRuntime JSRuntime
 
-@inherits Page<CertificateGeneratorMV>
+@inherits Page<CreateForCertificateMV>
 
-<PageTitle>Certificate Generator</PageTitle>
-
-<h2>Certificates List</h2>
-
-<FluentDataGrid Items="@ViewModel?.Certificates?.CertificatesDB.AsQueryable()">
-    <PropertyColumn Property="@(p => p.Id)" Sortable="true" Width="5%" />
-    <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="15%" />    
-    <PropertyColumn Property="@(p => p.Solution)" />
-    @* <PropertyColumn Property="@(p => p.CRTCertificate)" Sortable="true" Width="15%" />
-    <PropertyColumn Property="@(p => p.PFXCertificate)" Width="15%" /> *@
-    <PropertyColumn Property="@(p => p.Password)" Width="15%" />
-    <PropertyColumn Title = "DNS"   Property="@(p => string.Join(", ", p.DNS))" />
-    <PropertyColumn Property="@(p => p.Address)" />
-    <TemplateColumn Title="PFX">
-        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(context.Id))">Download</FluentButton>
-    </TemplateColumn>
-    <TemplateColumn Title="CA Root">
-        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
-    </TemplateColumn>
-</FluentDataGrid>
+<PageTitle>Create Certificate</PageTitle>
 
 
+
+<FluentStack Spacing="10" Orientation="Orientation.Vertical">
+    <FluentStack xs="12">
+        <h2>Manual Creation</h2>
+    </FluentStack>
+
+    <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
+        <FluentTextArea Rows="1" @bind-Value=Solution>Solution</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=CertificateAddress>Address</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Company>Company</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=CommonName>Common Name</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Password>Password</FluentTextArea>
+    </FluentStack>
+
+    <FluentStack xs="12">
+        <FluentButton IconStart="@(new Icons.Regular.Size16.GlobeArrowUp())" OnClick="() => MakeCrt()">Make</FluentButton>
+    </FluentStack>
+
+
+    <FluentGrid>
+        @if(Created)
+        {
+            <FluentStack xs="12"><FluentLabel>@IDString</FluentLabel></FluentStack>
+
+            <FluentStack xs="12">
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(ViewModel.CreatedCRTId, Solution))">Download PFX</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadCRT(ViewModel.CreatedCRTId, Solution))">Download CRT</FluentButton>
+            </FluentStack>
+
+            <FluentStack>
+                <FluentLabel>Output</FluentLabel>
+
+                <pre class="pre-formatted-text">
+
+                @((MarkupString)MakeOutput)
+            </pre>
+
+            </FluentStack>
+        }
+
+    </FluentGrid>
+
+
+
+</FluentStack>
 
 @code {
+    string Solution { get; set; } = "APP_X";
+    string CertificateAddress { get; set; } = "localhost";
+    string Company { get; set; } = "NXT";
+    string CommonName { get; set; } = "server";
+    string Password { get; set; } = "secret";
 
+    string MakeOutput { get; set; } = "";
+
+    public string IDString { get; set; } = "";
+    public bool Created = false;
 
     protected async override Task OnInitializedAsync()
     {
         // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
         base.OnInitializedAsync();
+    }
+
+    public async void MakeCrt()
+    {
+        var result = await ViewModel.Make(Company, CertificateAddress, Solution, CommonName, Password);
+
+        foreach(var res in result)
+        {
+            MakeOutput += $"<br>Created: {res.Created}, ThumbPrint: {res.ThumbPrint}, Serial: {res.SerialNumber}<br>";
+        }
+
+        Created = true;
+        IDString = $"Created the {ViewModel.CreatedCRTId} crt";
+        ViewModel.OnStateChange("Update the output");
+
     }
 
 }

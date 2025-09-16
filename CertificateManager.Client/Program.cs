@@ -1,3 +1,4 @@
+using CertificateCommon;
 using CertificateManager.Client.src.Models;
 using Common;
 using CommonBlazor.HttpClient;
@@ -53,6 +54,8 @@ namespace CertificateManager.Client
 
             builder.Services.AddSingleton(new AppData() { BaseUrl = uri });
             builder.Services.AddTransient<CertificateGeneratorMV>();
+            builder.Services.AddTransient<CreateForCertificateMV>();
+            builder.Services.AddTransient<ShaManager>();
             builder.Services.AddTransient<HelperMV>();
             builder.Services.AddSingleton<HttpClientFactoryCommon>();
             builder.Services.AddHttpClient(HttpClientFactoryCommon.ClientName, client => client.BaseAddress = uri);

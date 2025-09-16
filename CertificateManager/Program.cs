@@ -1,3 +1,4 @@
+using CertificateCommon;
 using CertificateManager.Client;
 using CertificateManager.Client.Pages;
 using CertificateManager.Client.src;
@@ -48,7 +49,7 @@ namespace CertificateManager
 
             builder.Services.AddHostedService<StartupClass>();
 
-            FileManagerCertificate manager = new FileManagerCertificate("OUTPUT/Certificates.Json", Logger);
+            FileManagerCertificate manager = new FileManagerCertificate("OUTPUT/Certificates.Json", Logger, new ShaManager());
 
             builder.Services.AddSingleton<AppData>();
             builder.Services.AddSingleton(manager);

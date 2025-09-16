@@ -1,4 +1,5 @@
-﻿using Microsoft.JSInterop;
+﻿using CertificateCommon;
+using Microsoft.JSInterop;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -16,10 +17,13 @@ namespace CommonBlazor.HttpClient
         public static string ClientName => "Client";
         IHttpClientFactory? _httpFactory;
         Serilog.ILogger? _logger;
-        public HttpClientFactoryCommon(IHttpClientFactory factory, Serilog.ILogger logger)
+        ShaManager _shaManager { get; init; }
+        public HttpClientFactoryCommon(IHttpClientFactory factory, Serilog.ILogger logger, ShaManager sha)
         {
             _httpFactory = factory;
             _logger = logger;
+
+            _shaManager = sha;
 
             var client = factory.CreateClient(ClientName);
             _logger = logger.ForContext(Serilog.Core.Constants.SourceContextPropertyName, "Common Http Factory");
@@ -65,18 +69,43 @@ namespace CommonBlazor.HttpClient
 
                     if(response.IsSuccessStatusCode)
                     {
-                        var stream = await response.Content.ReadAsStreamAsync();
+                        //var stream = await response.Content.ReadAsStreamAsync();
+                        //var fileName = beforeName + response.Content.Headers.ContentDisposition?.FileNameStar ?? "downloaded_file";
+
+                        //using var networkStream = await response.Content.ReadAsStreamAsync();
+                        //var memoryStream = new MemoryStream();
+                        //await networkStream.CopyToAsync(memoryStream);
+
+                        //string sha = _shaManager.HashFile(memoryStream);
+                        //_logger?.Information($"Sha {fileName} {sha}");
+
+                        //memoryStream.Position = 0;
+                        //using var streamRef = new DotNetStreamReference(stream: memoryStream);
+
+                        //await runtime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+
+
                         var fileName = beforeName + response.Content.Headers.ContentDisposition?.FileNameStar ?? "downloaded_file";
 
+                        // 1. Leggi lo stream dalla risposta UNA SOLA VOLTA
                         using var networkStream = await response.Content.ReadAsStreamAsync();
+
+                        // 2. Copialo in un MemoryStream per poterlo riutilizzare
                         var memoryStream = new MemoryStream();
                         await networkStream.CopyToAsync(memoryStream);
 
+                        // 3. Calcola l'hash dal MemoryStream
+                        // (Assicurati che la posizione sia all'inizio se il tuo metodo non lo fa già)
                         memoryStream.Position = 0;
+                        string sha = _shaManager.HashFile(memoryStream);
+                        _logger?.Warning($"Sha {fileName} {sha}");
+
+                        // 4. Riporta la posizione all'inizio prima di passarlo al download
+                        memoryStream.Position = 0;
+
+                        // 5. Usa lo STESSO MemoryStream per il download
                         using var streamRef = new DotNetStreamReference(stream: memoryStream);
-
                         await runtime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
-
                     }
                 }
                 catch(Exception ex)
