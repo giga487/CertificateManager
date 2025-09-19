@@ -24,6 +24,10 @@
     <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
         <FluentTextArea Rows="1" @bind-Value=DNS1>DNS</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=DNS2>DNS</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=DNS3>DNS</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=DNS4>DNS</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=DNS5>DNS</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=DNS6>DNS</FluentTextArea>
     </FluentStack>
 
     <FluentStack xs="12">
@@ -72,7 +76,10 @@
 
     public string DNS1 { get; set; } = "";
     public string DNS2 { get; set; } = "";
-
+    public string DNS3 { get; set; } = "";
+    public string DNS4 { get; set; } = ""; 
+    public string DNS5 { get; set; } = "";
+    public string DNS6 { get; set; } = "";
 
 
     protected async override Task OnInitializedAsync()
@@ -92,6 +99,26 @@
         if(!string.IsNullOrEmpty(DNS2))
         {
             dns.Add(DNS2);
+        }
+
+        if(!string.IsNullOrEmpty(DNS3))
+        {
+            dns.Add(DNS3);
+        }
+
+        if(!string.IsNullOrEmpty(DNS4))
+        {
+            dns.Add(DNS4);
+        }
+
+        if(!string.IsNullOrEmpty(DNS5))
+        {
+            dns.Add(DNS5);
+        }
+
+        if(!string.IsNullOrEmpty(DNS6))
+        {
+            dns.Add(DNS6);
         }
 
         var result = await ViewModel.Make(Company, CertificateAddress, Solution, CommonName, Password, dns.ToArray());
