@@ -188,9 +188,18 @@ namespace CertificateCommon
             return fileInfo;
         }
 
-        public IPAddress ManageServerAddress(string serverAddress)
+        public bool IsLocalHost(string serverAddress)
         {
             if(string.Compare(serverAddress, "localhost", true) == 0)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public IPAddress ManageServerAddress(string serverAddress)
+        {
+            if(IsLocalHost(serverAddress))
             {
                 return IPAddress.Loopback;
             }
@@ -240,11 +249,32 @@ namespace CertificateCommon
 
             var san = new SubjectAlternativeNameBuilder();
 
-            var address = ManageServerAddress(serverAddress);
+            var listOfDnss = serverDNS.ToList();
+
+            IPAddress address = IPAddress.None;
+
+            if(IsLocalHost(serverAddress))
+            {
+                IPAddress[] localhostAddresses = Dns.GetHostAddresses(serverAddress);
+
+                foreach(var addres in localhostAddresses)
+                {
+                    if(addres.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    {
+                        address = addres;
+                        break;
+                    }
+                }
+                listOfDnss.Add(serverAddress);
+            }
+            else
+            {
+                address = ManageServerAddress(serverAddress);
+            }
 
             san.AddIpAddress(ipAddress: address);
 
-            foreach(var serverN in serverDNS)
+            foreach(var serverN in listOfDnss)
             {
                 san.AddDnsName(serverN);
             }

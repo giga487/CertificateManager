@@ -21,6 +21,11 @@
         <FluentTextArea Rows="1" @bind-Value=Password>Password</FluentTextArea>
     </FluentStack>
 
+    <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
+        <FluentTextArea Rows="1" @bind-Value=DNS1>DNS</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=DNS2>DNS</FluentTextArea>
+    </FluentStack>
+
     <FluentStack xs="12">
         <FluentButton IconStart="@(new Icons.Regular.Size16.GlobeArrowUp())" OnClick="() => MakeCrt()">Make</FluentButton>
     </FluentStack>
@@ -65,6 +70,11 @@
     public string IDString { get; set; } = "";
     public bool Created = false;
 
+    public string DNS1 { get; set; } = "";
+    public string DNS2 { get; set; } = "";
+
+
+
     protected async override Task OnInitializedAsync()
     {
         // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
@@ -73,7 +83,18 @@
 
     public async void MakeCrt()
     {
-        var result = await ViewModel.Make(Company, CertificateAddress, Solution, CommonName, Password);
+        List<string> dns = new();
+        if(!string.IsNullOrEmpty(DNS1))
+        {
+            dns.Add(DNS1);
+        }
+
+        if(!string.IsNullOrEmpty(DNS2))
+        {
+            dns.Add(DNS2);
+        }
+
+        var result = await ViewModel.Make(Company, CertificateAddress, Solution, CommonName, Password, dns.ToArray());
 
         foreach(var res in result)
         {

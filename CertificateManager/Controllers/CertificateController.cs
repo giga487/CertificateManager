@@ -56,7 +56,7 @@ namespace CertificateManager.Controllers
         }
 
 
-        [HttpGet("MakeDNS")]
+        [HttpPost("MakeDNS")]
         public IActionResult GetCertificatesWithDNS(string cn, string address, string company, string solutionName, string password, [FromBody] string[] dnsName)
         {
             try

@@ -49,13 +49,20 @@ namespace CertificateManager.Client.src.Models
         }
 
 
-        public async Task<List<CertficateFileInfo>?> Make(string company, string address, string solutionName, string cn, string password)
+        public async Task<List<CertficateFileInfo>?> Make(string company, string address, string solutionName, string cn, string password, params string[] dnsss)
         {
             List<CertficateFileInfo> result = new List<CertficateFileInfo>();
 
             try
             {
-                result = await _factory?.GetAsync<List<CertficateFileInfo>>($"api/Certificate/Make?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}");
+                if(dnsss.Length > 0)
+                {
+                    result = await _factory?.PostAsync<List<CertficateFileInfo>, string[]>($"api/Certificate/MakeDNS?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}", dnsss);
+
+                }
+                else
+                    result = await _factory?.GetAsync<List<CertficateFileInfo>>($"api/Certificate/Make?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}");
+
                 await GetId(solutionName);
             }
             catch(OperationCanceledException ex)

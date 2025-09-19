@@ -4,6 +4,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
@@ -117,7 +118,36 @@ namespace CommonBlazor.HttpClient
             return;
         }
 
+        public async Task<T> PostAsync<T, U>(string url, U body)
+        {
+            var client = _httpFactory?.CreateClient(ClientName);
 
+            if(client is not null)
+            {
+                try
+                {
+                    var response = await client.PostAsJsonAsync(url, body);
+
+                    if(response.IsSuccessStatusCode)
+                    {
+                        var result = await response.Content.ReadFromJsonAsync<T>();
+                        response.EnsureSuccessStatusCode();
+
+                        if(result is not null)
+                        {
+                            return result;
+                        }
+
+                    }
+                }
+                catch(Exception ex)
+                {
+                    _logger?.Information(ex.Message);
+                }
+            }
+
+            return default;
+        }
 
         public async Task<T?> GetAsync<T>(string address)
         {
