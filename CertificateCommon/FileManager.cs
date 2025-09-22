@@ -78,8 +78,8 @@ namespace CertificateManager.src
         //public string? ServerAddress { get; init; }
         public string? Password { get; init; }
         public int? Id { get; init; }
-        //public string? Company { get; init; }
-        //public string? CN { get; init; }
+        public string? Company { get; init; }
+        public string? CN { get; init; }
         public string? Solution { get; init; }
         public string? PFXCertificate { get; init; }
         public string? CRTCertificate { get; init; }
@@ -215,13 +215,15 @@ namespace CertificateManager.src
 
         }
 
-        public void Add(string pfxFile, string crtRoot, string solution, string password, string rootThumbprint, string address, string[] dns)
+        public void Add(string pfxFile, string company, string commonName, string crtRoot, string solution, string password, string rootThumbprint, string address, string[] dns)
         {
 
             CertificateComplete crt = new CertificateComplete()
             {
                 CRTCertificate = crtRoot,
                 PFXCertificate = pfxFile,
+                CN = commonName,
+                Company = company,  
                 Solution = solution,
                 Password = password,
                 Id = _lastJSonMemory?.MaxId + 1,

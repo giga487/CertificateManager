@@ -169,13 +169,17 @@ namespace CertificateCommon
                     fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son));
 
                     string certFileName = Path.Join(path, certName);
-                    File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));
+
+                    //File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));//questa per CER
+                    File.WriteAllText(certFileName, x509Son.ExportCertificatePem());//questa per CER
                     fileInfo.Add(new CertficateFileInfo(certFileName, x509Son));
 
                     string certFileNameRoot = Path.Join(path, "Root.crt");
                     fileInfo.Add(ExtractRoot(certFileNameRoot));
 
-                    FileManager?.Add(pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: solutionFolder, password: exportPWD, rootThumbprint: CARoot.Thumbprint, address: serverAddress, dns: serverDNS);
+                    FileManager?.Add(commonName: commonName, company: company,  
+                        pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: solutionFolder, 
+                        password: exportPWD, rootThumbprint: CARoot.Thumbprint, address: serverAddress, dns: serverDNS);
 
                 }
                 catch(Exception ex)

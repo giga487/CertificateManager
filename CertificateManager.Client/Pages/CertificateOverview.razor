@@ -2,7 +2,7 @@
 @using CertificateManager.Client.src.Models
 @inject IJSRuntime JSRuntime
 
-@inherits Page<CertificateGeneratorMV>
+@inherits Page<CertificateOvervieVM>
 
 <PageTitle>Certificate Generator</PageTitle>
 
@@ -22,6 +22,9 @@
     </TemplateColumn>
     <TemplateColumn Title="CA Root">
         <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
+    </TemplateColumn>
+    <TemplateColumn Title="Regenerate">
+        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(context.Id))">Modify</FluentButton>
     </TemplateColumn>
 </FluentDataGrid>
 

@@ -1,13 +1,15 @@
 ﻿using CertificateManager.src;
 using Common.src.Architecture.Interface;
 using CommonBlazor.HttpClient;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Microsoft.VisualBasic;
 using System.ComponentModel;
+using static CertificateCommon.CertificationManager;
 
 namespace CertificateManager.Client.src.Models
 {
-    public class CertificateGeneratorMV : IViewModel, IAsyncDisposable
+    public class CertificateOvervieVM : IViewModel, IAsyncDisposable
     {
         public event EventHandler<PropertyChangedEventArgs>? PropertyChanged;
         private HttpClientFactoryCommon? _factory { get; init; }
@@ -15,17 +17,38 @@ namespace CertificateManager.Client.src.Models
         Serilog.ILogger _logger { get; init; }
 
         IJSRuntime _jsRuntime { get; init; }
+        NavigationManager _manager { get; init; }
 
-        public CertificateGeneratorMV(HttpClientFactoryCommon factory, Serilog.ILogger logger, IJSRuntime runtime)
+        public CertificateOvervieVM(HttpClientFactoryCommon factory, Serilog.ILogger logger, IJSRuntime runtime, NavigationManager manager)
         {
             _factory = factory;
 
             _logger = logger;
             _jsRuntime = runtime;
-
+            _manager = manager;
             Polling();
         }
+        public async Task Make(string company, string address, string solutionName, string cn, string password, params string[] dnsss)
+        {
+            List<CertficateFileInfo> result = new List<CertficateFileInfo>();
 
+            try
+            {
+                if(dnsss.Length > 0)
+                {
+                    result = await _factory?.PostAsync<List<CertficateFileInfo>, string[]>($"api/Certificate/MakeDNS?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}", dnsss);
+
+                }
+                else
+                    result = await _factory?.GetAsync<List<CertficateFileInfo>>($"api/Certificate/Make?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}");
+
+            }
+            catch(OperationCanceledException ex)
+            {
+                _logger?.Warning($"Error making {ex.Message}");
+
+            }
+        }
         public CertificateDB? Certificates { get; private set; } = null;
 
         Task? _pollingTask;
@@ -93,6 +116,12 @@ namespace CertificateManager.Client.src.Models
 
             }
         }
+
+        public async void Regenerate(int? id)
+        {
+            _manager.NavigateTo($"/certificateGenerator/ID={id}");
+        }
+
 
         public async void DownloadCRT(int? id)
         {

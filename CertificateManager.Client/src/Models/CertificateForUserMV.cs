@@ -43,11 +43,15 @@ namespace CertificateManager.Client.src.Models
 
         public async Task GetId(string solution)
         {
-            int? result = await _factory?.GetAsync<int>($"api/Certificate/ID?solution={solution}");
+            int? result = await _factory!.GetAsync<int>($"api/Certificate/ID?solution={solution}");
 
             CreatedCRTId = result ?? -1;
         }
 
+        public async Task<Certificate?> GetCertificateID(int id)
+        {
+            return await _factory!.GetAsync<Certificate>($"api/Certificate/Get?id={id}") ?? default;
+        }
 
         public async Task<List<CertficateFileInfo>?> Make(string company, string address, string solutionName, string cn, string password, params string[] dnsss)
         {
@@ -57,7 +61,7 @@ namespace CertificateManager.Client.src.Models
             {
                 if(dnsss.Length > 0)
                 {
-                    result = await _factory?.PostAsync<List<CertficateFileInfo>, string[]>($"api/Certificate/MakeDNS?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}", dnsss);
+                    result = await _factory!.PostAsync<List<CertficateFileInfo>, string[]>($"api/Certificate/MakeDNS?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}", dnsss);
 
                 }
                 else

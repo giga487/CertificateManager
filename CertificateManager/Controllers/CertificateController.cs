@@ -33,6 +33,19 @@ namespace CertificateManager.Controllers
             }
         }
 
+        [HttpGet("Get")]
+        public IActionResult GetCertificate(int id)
+        {
+            if(_certificationManager?.FileManager?.JSONMemory?.Get(id, out var certificate) ?? false)
+            {
+                return Ok(certificate);
+            }
+
+            return BadRequest($"No certificate with ID: {id}");
+            
+        }
+
+
 
         [HttpGet("Make")]
         public IActionResult GetCertificates(string cn, string address, string company, string solutionName, string password)
@@ -61,9 +74,10 @@ namespace CertificateManager.Controllers
         {
             try
             {
-                var result = _certificationManager?.CreatingPFX_CRT("server1",
+                var result = _certificationManager?.CreatingPFX_CRT(
                     serverAddress: address,
                     company: company,
+                    commonName:cn,
                     exportPWD: password,
                     expiring: DateTimeOffset.Now + TimeSpan.FromDays(3650),
                     solutionFolder: solutionName,

@@ -1,12 +1,10 @@
-﻿@page "/certificateGenerator"
+﻿@page "/certificateGenerator/ID={ID:int}"
 @using CertificateManager.Client.src.Models
 @inject IJSRuntime JSRuntime
 
 @inherits Page<CreateForCertificateMV>
 
 <PageTitle>Create Certificate</PageTitle>
-
-
 
 <FluentStack Spacing="10" Orientation="Orientation.Vertical">
     <FluentStack xs="12">
@@ -63,6 +61,10 @@
 </FluentStack>
 
 @code {
+
+    [Parameter]
+    public int ID { get; set; } = -1;
+
     string Solution { get; set; } = "APP_X";
     string CertificateAddress { get; set; } = "localhost";
     string Company { get; set; } = "NXT";
@@ -85,7 +87,33 @@
     protected async override Task OnInitializedAsync()
     {
         // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
-        base.OnInitializedAsync();
+
+        if(ID != -1)
+        {
+            var cert = await ViewModel.GetCertificateID(ID);
+
+            Solution = cert.Solution;
+            Password = cert.Password;
+            CertificateAddress = cert.Address;
+            CommonName = cert.CN;
+            Company = cert.Company;
+
+            if(cert.DNS?.Length > 0)
+                DNS1 = cert.DNS[0];
+            if(cert.DNS?.Length > 1)
+                DNS2 = cert.DNS[1];
+            if(cert.DNS?.Length > 2)
+                DNS3 = cert.DNS[2];
+            if(cert.DNS?.Length > 3)
+                DNS4 = cert.DNS[3];
+            if(cert.DNS?.Length > 4)
+                DNS5 = cert.DNS[4];
+            if(cert.DNS?.Length > 5)
+                DNS6 = cert.DNS[5];
+
+        }
+
+        await base.OnInitializedAsync();
     }
 
     public async void MakeCrt()

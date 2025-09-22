@@ -53,7 +53,7 @@ namespace CertificateManager.Client
             var uri = new UriBuilder(builder.HostEnvironment.BaseAddress).Uri;
 
             builder.Services.AddSingleton(new AppData() { BaseUrl = uri });
-            builder.Services.AddTransient<CertificateGeneratorMV>();
+            builder.Services.AddTransient<CertificateOvervieVM>();
             builder.Services.AddTransient<CreateForCertificateMV>();
             builder.Services.AddTransient<ShaManager>();
             builder.Services.AddTransient<HelperMV>();
