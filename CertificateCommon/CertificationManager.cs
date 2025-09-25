@@ -84,7 +84,7 @@ namespace CertificateCommon
             if(CARoot is null)
                 throw new CARootNotFoundException();
 
-            File.WriteAllBytes(certFileName, CARoot.Export(X509ContentType.Cert));
+            File.WriteAllText(certFileName, CARoot.ExportCertificatePem());
 
             return new CertficateFileInfo(certFileName, CARoot);
 
