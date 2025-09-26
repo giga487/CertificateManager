@@ -45,43 +45,19 @@ namespace CertificateManager.Controllers
             
         }
 
-
-
-        [HttpGet("Make")]
-        public IActionResult GetCertificates(string cn, string address, string company, string solutionName, string password)
-        {
-            try
-            {
-                var result = _certificationManager?.CreatingPFX_CRT("server1",
-                    serverAddress: address,
-                    company: company,
-                    exportPWD: password,
-                    expiring: DateTimeOffset.Now + TimeSpan.FromDays(3650),
-                    solutionFolder: solutionName);
-
-                return Ok(result);
-            }
-            catch(Exception ex)
-            {
-                _logger?.Warning($"Error making certificate: {ex.Message}");
-                return BadRequest(ex.Message);
-            }
-        }
-
-
-        [HttpPost("MakeDNS")]
-        public IActionResult GetCertificatesWithDNS(string cn, string address, string company, string solutionName, string password, [FromBody] string[] dnsName)
+        [HttpPost("MakeCertificate")]
+        public IActionResult MakeCertificate([FromBody] Certificate certificate)
         {
             try
             {
                 var result = _certificationManager?.CreatingPFX_CRT(
-                    serverAddress: address,
-                    company: company,
-                    commonName:cn,
-                    exportPWD: password,
+                    serverAddress: certificate.Address,
+                    company: certificate.Company,
+                    commonName: certificate.CN,
+                    exportPWD: certificate.Password,
                     expiring: DateTimeOffset.Now + TimeSpan.FromDays(3650),
-                    solutionFolder: solutionName,
-                    serverDNS: dnsName);
+                    solutionFolder: certificate.Solution,
+                    serverDNS: certificate.DNS);
 
                 return Ok(result);
             }

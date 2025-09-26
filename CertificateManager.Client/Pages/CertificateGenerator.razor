@@ -19,7 +19,7 @@
         <FluentTextArea Rows="1" @bind-Value=Password>Password</FluentTextArea>
     </FluentStack>
 
-    <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
+  @*   <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
         <FluentTextArea Rows="1" @bind-Value=DNS1>DNS</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=DNS2>DNS</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=DNS3>DNS</FluentTextArea>
@@ -28,7 +28,31 @@
         <FluentTextArea Rows="1" @bind-Value=DNS6>DNS</FluentTextArea>
     </FluentStack>
 
+    *@
+
     <FluentStack xs="12">
+        <FluentButton IconStart="@(new Icons.Regular.Size16.GlobeArrowUp())" OnClick="() => AddDNSText()">AddDNS</FluentButton>
+    </FluentStack>
+
+    <div style="margin-top: 1rem;">
+        <div class="wrap-container">
+            @for(int i = 0; i < DNSStrings.Count; i++)
+            {
+                var index = i;
+
+                <FluentStack ItemSpacing="5" Orientation="Orientation.Horizontal" class="flex-item">
+                    <FluentTextArea style="width: 300px;"
+                                    Placeholder="@($"DNS {index + 1}")"
+                                    @bind-Value="DNSStrings[index]" />
+
+                    <FluentButton IconEnd="@(new Icons.Regular.Size16.Delete())"
+                                  OnClick="@(() => Remove(index))" />
+                </FluentStack>
+            }
+        </div>
+    </div>
+
+        <FluentStack xs="12">
         <FluentButton IconStart="@(new Icons.Regular.Size16.GlobeArrowUp())" OnClick="() => MakeCrt()">Make</FluentButton>
     </FluentStack>
 
@@ -76,20 +100,40 @@
     public string IDString { get; set; } = "";
     public bool Created = false;
 
-    public string DNS1 { get; set; } = "";
-    public string DNS2 { get; set; } = "";
-    public string DNS3 { get; set; } = "";
-    public string DNS4 { get; set; } = ""; 
-    public string DNS5 { get; set; } = "";
-    public string DNS6 { get; set; } = "";
+    // public string DNS1 { get; set; } = "";
+    // public string DNS2 { get; set; } = "";
+    // public string DNS3 { get; set; } = "";
+    // public string DNS4 { get; set; } = ""; 
+    // public string DNS5 { get; set; } = "";
+    // public string DNS6 { get; set; } = "";
+
+    public List<string> DNSStrings;
+    public void SetDns(int index, string text)
+    {
+        DNSStrings[index] = text;
+    }
+    private void Remove(int index)
+    {
+        if(index >= 0 && index < DNSStrings.Count)
+        {
+            DNSStrings.RemoveAt(index);
+        }
+    }
+    public void AddDNSText()
+    {
+        DNSStrings.Add($"{DNSStrings.Count}");
+        StateHasChanged();
+    }
 
 
     protected async override Task OnInitializedAsync()
     {
         // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
+        DNSStrings  = new List<string>() { "" };
 
         if(ID != -1)
         {
+            DNSStrings.Clear();
             var cert = await ViewModel.GetCertificateID(ID);
 
             Solution = cert.Solution;
@@ -98,63 +142,81 @@
             CommonName = cert.CN;
             Company = cert.Company;
 
-            if(cert.DNS?.Length > 0)
-                DNS1 = cert.DNS[0];
-            if(cert.DNS?.Length > 1)
-                DNS2 = cert.DNS[1];
-            if(cert.DNS?.Length > 2)
-                DNS3 = cert.DNS[2];
-            if(cert.DNS?.Length > 3)
-                DNS4 = cert.DNS[3];
-            if(cert.DNS?.Length > 4)
-                DNS5 = cert.DNS[4];
-            if(cert.DNS?.Length > 5)
-                DNS6 = cert.DNS[5];
+            foreach(var dns in cert.DNS)
+            {
+                if(string.IsNullOrEmpty(dns))
+                    continue;
+
+                DNSStrings.Add(dns);
+            }
+
+
+            // if(cert.DNS?.Length > 0)
+            //     DNS1 = cert.DNS[0];
+            // if(cert.DNS?.Length > 1)
+            //     DNS2 = cert.DNS[1];
+            // if(cert.DNS?.Length > 2)
+            //     DNS3 = cert.DNS[2];
+            // if(cert.DNS?.Length > 3)
+            //     DNS4 = cert.DNS[3];
+            // if(cert.DNS?.Length > 4)
+            //     DNS5 = cert.DNS[4];
+            // if(cert.DNS?.Length > 5)
+            //     DNS6 = cert.DNS[5];
 
         }
 
         await base.OnInitializedAsync();
+        StateHasChanged();
     }
 
     public async void MakeCrt()
     {
-        List<string> dns = new();
-        if(!string.IsNullOrEmpty(DNS1))
-        {
-            dns.Add(DNS1);
-        }
+        // List<string> dns = new();
+        // if(!string.IsNullOrEmpty(DNS1))
+        // {
+        //     dns.Add(DNS1);
+        // }
 
-        if(!string.IsNullOrEmpty(DNS2))
-        {
-            dns.Add(DNS2);
-        }
+        // if(!string.IsNullOrEmpty(DNS2))
+        // {
+        //     dns.Add(DNS2);
+        // }
 
-        if(!string.IsNullOrEmpty(DNS3))
-        {
-            dns.Add(DNS3);
-        }
+        // if(!string.IsNullOrEmpty(DNS3))
+        // {
+        //     dns.Add(DNS3);
+        // }
 
-        if(!string.IsNullOrEmpty(DNS4))
-        {
-            dns.Add(DNS4);
-        }
+        // if(!string.IsNullOrEmpty(DNS4))
+        // {
+        //     dns.Add(DNS4);
+        // }
 
-        if(!string.IsNullOrEmpty(DNS5))
-        {
-            dns.Add(DNS5);
-        }
+        // if(!string.IsNullOrEmpty(DNS5))
+        // {
+        //     dns.Add(DNS5);
+        // }
 
-        if(!string.IsNullOrEmpty(DNS6))
-        {
-            dns.Add(DNS6);
-        }
+        // if(!string.IsNullOrEmpty(DNS6))
+        // {
+        //     dns.Add(DNS6);
+        // }
 
-        var result = await ViewModel.Make(Company, CertificateAddress, Solution, CommonName, Password, dns.ToArray());
+        var result = await ViewModel.Make(Company, CertificateAddress, Solution, CommonName, Password, DNSStrings.ToArray());
 
-        foreach(var res in result)
+        foreach(var res in result ?? new ())
         {
             MakeOutput += $"<br>Created: {res.Created}, ThumbPrint: {res.ThumbPrint}, Serial: {res.SerialNumber}<br>";
         }
+
+        if(result is null)
+        {
+            await JSRuntime.InvokeVoidAsync("showAlert", "Certificate is not created");
+            ViewModel.OnStateChange("Update the output");
+            return;
+        }
+
 
         Created = true;
         IDString = $"Created the {ViewModel.CreatedCRTId} crt";

@@ -130,7 +130,7 @@ namespace CertificateCommon
             }
         }
 
-        public List<CertficateFileInfo> CreatingPFX_CRT(string commonName, string serverAddress, string company, string exportPWD, DateTimeOffset expiring, string solutionFolder, string pfxName = "Certificate.pfx", string certName = "Certificate.crt", params string[] serverDNS)
+        public List<CertficateFileInfo> CreatingPFX_CRT(string? commonName, string? serverAddress, string? company, string? exportPWD, DateTimeOffset expiring, string? solutionFolder, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt", params string[] serverDNS)
         {
             List<CertficateFileInfo> fileInfo = new List<CertficateFileInfo>();
             using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256); // Uso di ECDsa come da te suggerito
@@ -224,7 +224,7 @@ namespace CertificateCommon
             }
         }
 
-        public X509Certificate2? CreateCASon(string commonName, string serverAddress, string company, ECDsa privateKey, DateTimeOffset expiring, string friendlyName = "", params string[] serverDNS)
+        public X509Certificate2? CreateCASon(string? commonName, string? serverAddress, string? company, ECDsa privateKey, DateTimeOffset expiring, string? friendlyName = "", params string[] serverDNS)
         {
 
             if(CARoot is null)

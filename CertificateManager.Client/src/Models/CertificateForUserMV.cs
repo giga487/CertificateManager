@@ -53,19 +53,25 @@ namespace CertificateManager.Client.src.Models
             return await _factory!.GetAsync<Certificate>($"api/Certificate/Get?id={id}") ?? default;
         }
 
+
+
         public async Task<List<CertficateFileInfo>?> Make(string company, string address, string solutionName, string cn, string password, params string[] dnsss)
         {
             List<CertficateFileInfo> result = new List<CertficateFileInfo>();
 
+            Certificate newCert = new Certificate()
+            {
+                Solution = solutionName,
+                Address = address,
+                CN = cn,
+                Company = company,
+                DNS = dnsss.ToArray(),
+                Password = password,
+            };
+
             try
             {
-                if(dnsss.Length > 0)
-                {
-                    result = await _factory!.PostAsync<List<CertficateFileInfo>, string[]>($"api/Certificate/MakeDNS?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}", dnsss);
-
-                }
-                else
-                    result = await _factory?.GetAsync<List<CertficateFileInfo>>($"api/Certificate/Make?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}");
+                result = await _factory?.PostAsync<List<CertficateFileInfo>, Certificate>($"api/Certificate/MakeCertificate", newCert) ?? default;
 
                 await GetId(solutionName);
             }

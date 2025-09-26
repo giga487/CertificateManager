@@ -1,4 +1,4 @@
-﻿window.mostraAlert = (messaggio) => {
+﻿window.showAlert = (messaggio) => {
     alert(messaggio);
 };
 

@@ -9,7 +9,7 @@ using static CertificateCommon.CertificationManager;
 
 namespace CertificateManager.Client.src.Models
 {
-    public class CertificateOvervieVM : IViewModel, IAsyncDisposable
+    public class CertificateOvervieVM : IViewModel
     {
         public event EventHandler<PropertyChangedEventArgs>? PropertyChanged;
         private HttpClientFactoryCommon? _factory { get; init; }
@@ -32,16 +32,19 @@ namespace CertificateManager.Client.src.Models
         {
             List<CertficateFileInfo> result = new List<CertficateFileInfo>();
 
+            Certificate newCert = new Certificate()
+            {
+                Solution = solutionName,
+                Address = address,
+                CN = cn,
+                Company = company,
+                DNS = dnsss.ToArray(),   
+                Password = password,
+            };
+
             try
             {
-                if(dnsss.Length > 0)
-                {
-                    result = await _factory?.PostAsync<List<CertficateFileInfo>, string[]>($"api/Certificate/MakeDNS?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}", dnsss);
-
-                }
-                else
-                    result = await _factory?.GetAsync<List<CertficateFileInfo>>($"api/Certificate/Make?address={address}&company={company}&solutionname={solutionName}&cn={cn}&password={password}");
-
+                result = await _factory?.PostAsync<List<CertficateFileInfo>, Certificate>($"api/Certificate/MakeCertificate", newCert) ?? default;
             }
             catch(OperationCanceledException ex)
             {

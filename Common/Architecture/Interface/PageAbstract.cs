@@ -6,7 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Common.src.Architecture.BaseClass
 {
 
-    public abstract class Page<T> : ComponentBase, IDisposable where T : IViewModel
+    public abstract class Page<T> : ComponentBase, IAsyncDisposable where T : IViewModel
     {
         [Inject]
         [NotNull]
@@ -32,10 +32,14 @@ namespace Common.src.Architecture.BaseClass
             _logger?.Information($"Opened the {typeof(T).Name} model view");
         }
 
-        public virtual void Dispose()
+        public async ValueTask DisposeAsync()
         {
             if(ViewModel is not null)
+            {
                 ViewModel.PropertyChanged -= OnStateChange;
+                await ViewModel.DisposeAsync();
+            }
+
         }
     }
 }

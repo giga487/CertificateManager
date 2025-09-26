@@ -3,7 +3,7 @@
 namespace Common.src.Architecture.Interface
 {
 
-    public interface IViewModel
+    public interface IViewModel: IAsyncDisposable
     {
         public event EventHandler<PropertyChangedEventArgs>? PropertyChanged;
 
