@@ -87,21 +87,25 @@ namespace CertificateManager.src
         public string? RootThumbPrint { get; set; } = string.Empty;
         public string? Address { get; init; }
         public string[]? DNS { get; init; }
+        public string? Oid { get; init; }
     }
 
     public class CertificateComplete: Certificate
     {
 
         [JsonIgnore]
-        public X509Certificate2 PFX { get; set; }
+        public X509Certificate2? PFX { get; set; }
         [JsonIgnore]
-        public X509Certificate2 CRT { get; set; }
+        public X509Certificate2? CRT { get; set; }
 
 
         public void LoadCertificate()
         {
-            CRT = new X509Certificate2(CRTCertificate);
-            PFX = new X509Certificate2(PFXCertificate, Password);
+            if(CRTCertificate is not null)
+                CRT = new X509Certificate2(CRTCertificate);
+
+            if(PFXCertificate is not null)
+                PFX = new X509Certificate2(PFXCertificate, Password);
         }
     }
 
@@ -215,7 +219,7 @@ namespace CertificateManager.src
 
         }
 
-        public void Add(string pfxFile, string company, string commonName, string crtRoot, string solution, string password, string rootThumbprint, string address, string[] dns)
+        public void Add(string pfxFile, string oid, string company, string commonName, string crtRoot, string solution, string password, string rootThumbprint, string address, string[] dns)
         {
 
             CertificateComplete crt = new CertificateComplete()
@@ -229,7 +233,8 @@ namespace CertificateManager.src
                 Id = _lastJSonMemory?.MaxId + 1,
                 RootThumbPrint = rootThumbprint,
                 Address = address,
-                DNS = dns
+                DNS = dns,
+                Oid = oid
             };
 
             crt.LoadCertificate();

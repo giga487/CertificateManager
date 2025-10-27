@@ -55,7 +55,7 @@ namespace CertificateManager.Client.src.Models
 
 
 
-        public async Task<List<CertficateFileInfo>?> Make(string company, string address, string solutionName, string cn, string password, params string[] dnsss)
+        public async Task<List<CertficateFileInfo>?> Make(string company, string address, string oid, string solutionName, string cn, string password, params string[] dnsss)
         {
             List<CertficateFileInfo> result = new List<CertficateFileInfo>();
 
@@ -67,6 +67,7 @@ namespace CertificateManager.Client.src.Models
                 Company = company,
                 DNS = dnsss.ToArray(),
                 Password = password,
+                Oid = oid
             };
 
             try

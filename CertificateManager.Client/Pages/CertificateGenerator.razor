@@ -17,6 +17,7 @@
         <FluentTextArea Rows="1" @bind-Value=Company>Company</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=CommonName>Common Name</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=Password>Password</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=OID>OID</FluentTextArea>
     </FluentStack>
 
   @*   <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
@@ -99,7 +100,7 @@
 
     public string IDString { get; set; } = "";
     public bool Created = false;
-
+    public string OID { get; set; } = "1.3.6.1.5.5.7.3.1";
     // public string DNS1 { get; set; } = "";
     // public string DNS2 { get; set; } = "";
     // public string DNS3 { get; set; } = "";
@@ -142,6 +143,9 @@
             CommonName = cert.CN;
             Company = cert.Company;
 
+            if(!string.IsNullOrEmpty(cert.Oid))
+                OID = cert.Oid;
+
             foreach(var dns in cert.DNS)
             {
                 if(string.IsNullOrEmpty(dns))
@@ -149,20 +153,6 @@
 
                 DNSStrings.Add(dns);
             }
-
-
-            // if(cert.DNS?.Length > 0)
-            //     DNS1 = cert.DNS[0];
-            // if(cert.DNS?.Length > 1)
-            //     DNS2 = cert.DNS[1];
-            // if(cert.DNS?.Length > 2)
-            //     DNS3 = cert.DNS[2];
-            // if(cert.DNS?.Length > 3)
-            //     DNS4 = cert.DNS[3];
-            // if(cert.DNS?.Length > 4)
-            //     DNS5 = cert.DNS[4];
-            // if(cert.DNS?.Length > 5)
-            //     DNS6 = cert.DNS[5];
 
         }
 
@@ -172,38 +162,7 @@
 
     public async void MakeCrt()
     {
-        // List<string> dns = new();
-        // if(!string.IsNullOrEmpty(DNS1))
-        // {
-        //     dns.Add(DNS1);
-        // }
-
-        // if(!string.IsNullOrEmpty(DNS2))
-        // {
-        //     dns.Add(DNS2);
-        // }
-
-        // if(!string.IsNullOrEmpty(DNS3))
-        // {
-        //     dns.Add(DNS3);
-        // }
-
-        // if(!string.IsNullOrEmpty(DNS4))
-        // {
-        //     dns.Add(DNS4);
-        // }
-
-        // if(!string.IsNullOrEmpty(DNS5))
-        // {
-        //     dns.Add(DNS5);
-        // }
-
-        // if(!string.IsNullOrEmpty(DNS6))
-        // {
-        //     dns.Add(DNS6);
-        // }
-
-        var result = await ViewModel.Make(Company, CertificateAddress, Solution, CommonName, Password, DNSStrings.ToArray());
+        var result = await ViewModel.Make(Company, CertificateAddress, OID, Solution, CommonName, Password, DNSStrings.ToArray());
 
         foreach(var res in result ?? new ())
         {

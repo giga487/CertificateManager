@@ -36,7 +36,7 @@ namespace UT
         public void CreatingChildren()
         {
             using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-            X509Certificate2? cert = Manager?.CreateCASon("server1", "localhost", "PACompany", serverKey, DateTimeOffset.Now + TimeSpan.FromDays(365));
+            X509Certificate2? cert = Manager?.CreateCASon("server1", oid: "1.3.6.1.5.5.7.3.2", "localhost", "PACompany", serverKey, DateTimeOffset.Now + TimeSpan.FromDays(365));
             
             if(cert == null)
             {
@@ -46,13 +46,18 @@ namespace UT
             Console.WriteLine(cert.ToString());
         }
 
+        /// <summary>
+        ///  oid: "1.3.6.1.5.5.7.3.2" is for mTLS Client authentication, Questo certificato può essere usato da un client (un utente, un dispositivo, un'app) per dimostrare la sua identità a un server.
+        ///  oid: "1.3.6.1.5.5.7.3.1" is for HTTPS Server authentication, Questo certificato può essere usato da un server per dimostrare la sua identità a un client.
+        /// </summary>
+
         [TestMethod]
         public void CreatingChildrenWithDNS()
         {
             string[] dnsNames = new string[] { "pluto", "pippo", "toporazzo" };
 
             using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-            X509Certificate2? cert = Manager?.CreateCASon("server1", "localhost", "PACompany", serverKey, DateTimeOffset.Now + TimeSpan.FromDays(365), serverDNS: dnsNames);
+            X509Certificate2? cert = Manager?.CreateCASon("server1", oid: "1.3.6.1.5.5.7.3.2", "localhost", "PACompany", serverKey, DateTimeOffset.Now + TimeSpan.FromDays(365), serverDNS: dnsNames);
 
             if(cert == null)
             {

@@ -52,6 +52,7 @@ namespace CertificateManager.Controllers
             {
                 var result = _certificationManager?.CreatingPFX_CRT(
                     serverAddress: certificate.Address,
+                    oid: certificate.Oid,
                     company: certificate.Company,
                     commonName: certificate.CN,
                     exportPWD: certificate.Password,

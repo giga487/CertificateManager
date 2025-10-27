@@ -130,7 +130,7 @@ namespace CertificateCommon
             }
         }
 
-        public List<CertficateFileInfo> CreatingPFX_CRT(string? commonName, string? serverAddress, string? company, string? exportPWD, DateTimeOffset expiring, string? solutionFolder, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt", params string[] serverDNS)
+        public List<CertficateFileInfo> CreatingPFX_CRT(string? commonName, string? oid, string? serverAddress, string? company, string? exportPWD, DateTimeOffset expiring, string? solutionFolder, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt", params string[] serverDNS)
         {
             List<CertficateFileInfo> fileInfo = new List<CertficateFileInfo>();
             using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256); // Uso di ECDsa come da te suggerito
@@ -140,7 +140,7 @@ namespace CertificateCommon
                 throw new CARootNotFoundException();
             }
 
-            X509Certificate2? x509Son = CreateCASon(commonName, serverAddress, company, serverKey, expiring, serverDNS: serverDNS);
+            X509Certificate2? x509Son = CreateCASon(commonName: commonName, oid: oid, serverAddress, company, serverKey, expiring, serverDNS: serverDNS);
 
             if(x509Son is null)
             {
@@ -177,7 +177,7 @@ namespace CertificateCommon
                     string certFileNameRoot = Path.Join(path, "Root.crt");
                     fileInfo.Add(ExtractRoot(certFileNameRoot));
 
-                    FileManager?.Add(commonName: commonName, company: company,  
+                    FileManager?.Add(commonName: commonName, company: company, oid: oid,
                         pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: solutionFolder, 
                         password: exportPWD, rootThumbprint: CARoot.Thumbprint, address: serverAddress, dns: serverDNS);
 
@@ -224,9 +224,10 @@ namespace CertificateCommon
             }
         }
 
-        public X509Certificate2? CreateCASon(string? commonName, string? serverAddress, string? company, ECDsa privateKey, DateTimeOffset expiring, string? friendlyName = "", params string[] serverDNS)
-        {
+        //new Oid("1.3.6.1.5.5.7.3.1")
 
+        public X509Certificate2? CreateCASon(string? commonName, string? oid, string? serverAddress, string? company, ECDsa privateKey, DateTimeOffset expiring, string? friendlyName = "", params string[] serverDNS)
+        {
             if(CARoot is null)
             {
                 throw new NotCARootConfiguredThumbprintException();
@@ -236,6 +237,18 @@ namespace CertificateCommon
             {
                 throw new CARootWithouthPrivateKeyException();
             }
+
+            Oid? oid1 = null;
+
+            try
+            {
+                oid1 = new Oid(oid);
+            }
+            catch
+            {
+                return null;
+            }
+
 
             var subject = new X500DistinguishedName(
                 $"CN={commonName}, O={company}, L=Pisa, S=PI, C=IT");
@@ -248,12 +261,12 @@ namespace CertificateCommon
             // Aggiungi le estensioni necessarie per un certificato server
             serverRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
             serverRequest.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
-            serverRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") }, false));
+            serverRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(new OidCollection { oid1 }, false));
             //var sanBuilder = new SubjectAlternativeNameBuilder();
 
             var san = new SubjectAlternativeNameBuilder();
 
-            var listOfDnss = serverDNS.ToList();
+            List<string>? listOfDnss = serverDNS.ToList();
 
             IPAddress address = IPAddress.None;
 
@@ -278,7 +291,7 @@ namespace CertificateCommon
 
             san.AddIpAddress(ipAddress: address);
 
-            foreach(var serverN in listOfDnss)
+            foreach(var serverN in listOfDnss ?? new List<string>())
             {
                 san.AddDnsName(serverN);
             }
