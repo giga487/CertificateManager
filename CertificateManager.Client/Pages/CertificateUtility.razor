@@ -15,8 +15,8 @@
 <FluentStack>
     <div><InputFile OnChange="@(e => ViewModel?.HandleFileSelectedCRT(e, CertificateUtilityVM.CertificateUtilityTabs.CERT))">Certificate</InputFile></div>
     <div>    <InputFile OnChange="@(e => ViewModel?.HandleFileSelectedCRT(e, CertificateUtilityVM.CertificateUtilityTabs.KEY))">KEY</InputFile></div>
-    <div>    <FluentTextField @bind-Value="ViewModel.Password" Type="password" Placeholder="Password" Label="Password"></FluentTextField></div>
-    <div>    <FluentTextField @bind-Value="ViewModel.PfxPassword" Type="password" Placeholder="Password" Label="Password"></FluentTextField></div>
+    <div>    <FluentTextField @bind-Value="ViewModel.Password" Type="password" Placeholder="Password" Label="Secret Password"></FluentTextField></div>
+    <div>    <FluentTextField @bind-Value="ViewModel.PfxPassword" Type="password" Placeholder="Password" Label="PFX Password"></FluentTextField></div>
     <div>
         <FluentButton OnClick="@CleanSelectedFiles" Appearance="Appearance.Accent">Clean</FluentButton>
     </div>
