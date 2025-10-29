@@ -118,6 +118,61 @@ namespace CommonBlazor.HttpClient
             return;
         }
 
+
+        public async Task<HttpResponseMessage> PostAsync(string url, MultipartFormDataContent body)
+        {
+            var client = _httpFactory?.CreateClient(ClientName);
+            if(client is not null)
+            {
+                try
+                {
+                    var response = await client.PostAsync(url, body);
+                    return response;
+                }
+                catch(Exception ex)
+                {
+                    _logger?.Information(ex.Message);
+                }
+            }
+            return new HttpResponseMessage(HttpStatusCode.BadRequest);
+        }
+
+
+        public async Task<T> PostAsync<T>(string url, MultipartFormDataContent body)
+        {
+
+            var client = _httpFactory?.CreateClient(ClientName);
+
+            if(client is not null)
+            {
+                try
+                {
+                    var response = await client.PostAsync(url, body);
+
+                    if(response.IsSuccessStatusCode)
+                    {
+                        var result = await response.Content.ReadFromJsonAsync<T>();
+                        response.EnsureSuccessStatusCode();
+
+                        if(result is not null)
+                        {
+                            return result;
+                        }
+
+                    }
+                }
+                catch(Exception ex)
+                {
+                    _logger?.Information(ex.Message);
+                }
+            }
+
+            return default;
+        }
+
+
+
+
         public async Task<T> PostAsync<T, U>(string url, U body)
         {
             var client = _httpFactory?.CreateClient(ClientName);

@@ -2,6 +2,7 @@ using CertificateCommon;
 using CertificateManager.Client;
 using CertificateManager.Client.Pages;
 using CertificateManager.Client.src;
+using CertificateManager.Client.src.Models;
 using CertificateManager.Components;
 using CertificateManager.src;
 using Common;

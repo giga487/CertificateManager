@@ -1,7 +1,10 @@
 ﻿using CertificateManager.src;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 namespace CertificateManager.Controllers
 {
@@ -45,6 +48,23 @@ namespace CertificateManager.Controllers
             
         }
 
+        [HttpPost("CeritificationInfo")]
+        public async Task<IActionResult> LoadCertificate([FromForm] IFormFile file)
+        {
+            return Ok(await _certificationManager?.GetCertInfoWithPassword(file, null, ""));
+        }
+
+        [HttpPost("CeritificationInfoWithKey")]
+        public async Task<IActionResult> LoadCertificateWithKey([FromForm] IFormFile file, [FromForm] IFormFile? key = null)
+        {
+            return Ok(await _certificationManager?.GetCertInfoWithPassword(file, key, ""));
+        }
+        [HttpPost("CeritificationInfoWithSecuredKey")]
+        public async Task<IActionResult> LoadCertificateWithKey([FromForm] IFormFile file, [FromForm] IFormFile? key, string password)
+        {
+            return Ok(await _certificationManager?.GetCertInfoWithPassword(file, key, ""));
+        }
+
         [HttpPost("MakeCertificate")]
         public IActionResult MakeCertificate([FromBody] Certificate certificate)
         {
@@ -85,6 +105,25 @@ namespace CertificateManager.Controllers
         { 
             return Ok(_certificationManager?.FileManager?.JSONMemory);
         }
+
+
+        [HttpPost("CreatePFXFromCRT")]
+        public async Task<IActionResult> CreatePFX([FromForm] IFormFile crtFile, [FromForm] IFormFile key, [FromForm] string? password, [FromForm] string pfxPassword)
+        {
+            try
+            {
+                byte[] certificateData = await _certificationManager!.CreatePFX(crtFile, key, password, pfxPassword) ?? new byte[0];
+
+                return File(certificateData, "application/x-x509-ca-cert", "Certificate.pfx");
+            }
+            catch(Exception ex)
+            {
+                _logger?.Warning($"Error creating PFX from CRT: {ex.Message}");
+            }
+
+            return BadRequest("Not able to create PFX from CRT");
+        }
+
 
 
         [HttpGet("downloadPFX")]

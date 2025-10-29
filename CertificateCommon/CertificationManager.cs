@@ -1,9 +1,13 @@
 ﻿using CertificateManager.src;
+using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using System.Net;
+using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 
 namespace CertificateCommon
 {
@@ -98,6 +102,158 @@ namespace CertificateCommon
             return new CertficateFileInfo(certFileName, CARoot);
 
         }
+        public async Task<byte[]?> ConvertIFormFileToByteArrayAsync(IFormFile file)
+        {
+
+            try
+            {
+                using(var memoryStream = new MemoryStream())
+                {
+                    // 2. Open the read stream from the IFormFile
+                    // In a real application, consider adding a size limit here: 
+                    // using (var fileStream = file.OpenReadStream(maxAllowedSize))
+                    using(var fileStream = file.OpenReadStream())
+                    {
+                        // 3. Asynchronously copy the content from the file stream 
+                        //    to the memory stream. This is efficient for I/O operations.
+                        await fileStream.CopyToAsync(memoryStream);
+                    }
+
+                    // 4. Reset the memory stream position to the beginning (0)
+                    //    before converting it to an array.
+                    memoryStream.Position = 0;
+
+                    // 5. Convert the MemoryStream content to a byte array and return it.
+                    return memoryStream.ToArray();
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<CertificateDetails> GetCertInfoWithPassword(IFormFile serverCrt, IFormFile? serverKey, string? password)
+        {
+            var serverCrtByteArray = await ConvertIFormFileToByteArrayAsync(serverCrt);
+            var serverKeyByteArray = await ConvertIFormFileToByteArrayAsync(serverKey);
+
+            return GetCertInfoWithPassword(serverCrtByteArray, serverKeyByteArray, password);
+        }
+
+        public async Task<byte[]?> CreatePFX(IFormFile serverCrt, IFormFile? serverKey, string? secretKeyPassword, string pfxPassword)
+        {
+            var serverCrtByteArray = await ConvertIFormFileToByteArrayAsync(serverCrt);
+            var serverKeyByteArray = await ConvertIFormFileToByteArrayAsync(serverKey);
+
+            return CreatePFX(serverCrtByteArray, serverKeyByteArray, secretKeyPassword, pfxPassword);
+        }
+        public byte[]? CreatePFX(byte[] serverCrt, byte[]? serverKey, string? secretKeyPassword, string pfxPassword)
+        {
+            if(serverCrt is null || serverCrt.Length == 0)
+            {
+                return null;
+            }
+
+            string privateKey = "";
+            string certPem = Encoding.UTF8.GetString(serverCrt);
+            if(serverKey is not null)
+                privateKey = Encoding.UTF8.GetString(serverKey);
+
+
+            X509Certificate2 certificate;
+
+            if(!string.IsNullOrEmpty(secretKeyPassword) && !string.IsNullOrEmpty(privateKey))
+            {
+                certificate = X509Certificate2.CreateFromEncryptedPem(certPem, privateKey, secretKeyPassword);
+            }
+            else if(!string.IsNullOrEmpty(privateKey))
+            {
+                certificate = X509Certificate2.CreateFromPem(certPem, privateKey);
+            }
+            else
+            {
+
+                return null;
+            }
+
+            return certificate.Export(X509ContentType.Pfx, pfxPassword);
+            
+        }
+
+
+
+        public CertificateDetails GetCertInfoWithPassword(byte[] serverCrt, byte[]? serverKey, string? password)
+        {
+            if(serverCrt is null || serverCrt.Length == 0)
+            {
+                return new CertificateDetails()
+                {
+                    Message = "Certificate data is null or empty",
+                };
+            }
+
+            string privateKey = "";
+            string certPem = Encoding.UTF8.GetString(serverCrt);
+            if(serverKey is not null)
+            privateKey = Encoding.UTF8.GetString(serverKey);
+
+            X509Certificate2 certificate;
+
+            try
+            {
+                if(!string.IsNullOrEmpty(password) && ! string.IsNullOrEmpty(privateKey))
+                {
+                    certificate = X509Certificate2.CreateFromEncryptedPem(certPem, privateKey, password);
+                }
+                else if(!string.IsNullOrEmpty(privateKey))
+                {
+                    certificate = X509Certificate2.CreateFromPem(certPem, privateKey);
+                }
+                else
+                {
+                    certificate = X509Certificate2.CreateFromPem(certPem);
+                }
+                
+            }
+
+            catch(CryptographicException ex)
+            {
+                // Throw exception for specific handling (e.g., wrong password, invalid format)
+                throw new CryptographicException("Failed to load certificate and key. Check PEM format and password.", ex);
+            }
+
+            var responseDto = new PrivateKeyCertificateDetails
+            {
+                // Populate basic details
+                Subject = certificate.Subject,
+                Issuer = certificate.Issuer,
+                ValidFrom = certificate.NotBefore,
+                ValidUntil = certificate.NotAfter,
+                ThumbPrint = certificate.Thumbprint,
+                KeyAlgo = certificate.PublicKey.Oid.FriendlyName,
+                KeySize = certificate.PublicKey.Key.KeySize,
+
+                HasPrivateKey = certificate.HasPrivateKey,
+
+                CanBeUsedForSigning = GetKeyUsage(certificate).HasFlag(X509KeyUsageFlags.DigitalSignature) || GetKeyUsage(certificate).HasFlag(X509KeyUsageFlags.NonRepudiation),
+                CanBeUsedForKeyEncryption = GetKeyUsage(certificate).HasFlag(X509KeyUsageFlags.KeyEncipherment) || GetKeyUsage(certificate).HasFlag(X509KeyUsageFlags.KeyAgreement),
+
+                // Message and FileName (if needed, might be omitted if this is an internal function)
+                Message = "Certificate and key loaded successfully.",
+                FileName = "Loaded from byte arrays"
+            };
+
+            return responseDto;
+        }
+
+        private X509KeyUsageFlags GetKeyUsage(X509Certificate2 cert)
+        {
+            var extension = cert.Extensions["2.5.29.15"] as X509KeyUsageExtension;
+            return extension != null ? extension.KeyUsages : X509KeyUsageFlags.None;
+        }
+
+
 
         public class CertficateFileInfo
         {

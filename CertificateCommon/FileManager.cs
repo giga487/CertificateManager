@@ -1,4 +1,5 @@
 ﻿using CertificateCommon;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -71,6 +72,57 @@ namespace CertificateManager.src
 
         }
 
+    }
+
+    public class PrivateKeyCertificateDetails : CertificateDetails
+    {
+        // Indicates whether the certificate contains a private key (Key property is available).
+        public bool HasPrivateKey { get; set; }
+
+        // Indicates whether the private key is exportable (can be extracted).
+        public bool IsPrivateKeyExportable { get; set; }
+
+        // Indicates whether the certificate can be used for digital signing (from Key Usage extension).
+        public bool CanBeUsedForSigning { get; set; }
+
+        // Indicates whether the certificate can be used for key encryption or key agreement (from Key Usage extension).
+        public bool CanBeUsedForKeyEncryption { get; set; }
+
+        // Optional: Storage flags used when loading the certificate (important for security).
+        public X509KeyStorageFlags StorageFlags { get; set; }
+    }
+
+    public class CertificateDetails
+    {
+        // Il nome del campo sarà preso da Display(Name)
+        [Display(Name = "Message")]
+        public string Message { get; set; } = "Certificate successfully loaded and processed.";
+
+        [Display(Name = "Name File")]
+        public string FileName { get; set; }
+
+        [Display(Name = "Subject")]
+        public string Subject { get; set; }
+
+        [Display(Name = "Issuer")]
+        public string Issuer { get; set; }
+
+        [JsonPropertyName("validFrom")]
+        [Display(Name = "Valido Dal")] // Nome amichevole per la data
+        public DateTime ValidFrom { get; set; }
+
+        [JsonPropertyName("validUntil")]
+        [Display(Name = "Valido Fino Al")] // Nome amichevole per la data
+        public DateTime ValidUntil { get; set; }
+
+        [Display(Name = "THumb Print")]
+        public string ThumbPrint { get; set; }
+
+        [Display(Name = "Algorithm Key")]
+        public string KeyAlgo { get; set; }
+
+        [Display(Name = "Key Size (bits)")]
+        public int KeySize { get; set; }
     }
 
     public class Certificate

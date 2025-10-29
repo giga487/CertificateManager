@@ -20,16 +20,6 @@
         <FluentTextArea Rows="1" @bind-Value=OID>OID</FluentTextArea>
     </FluentStack>
 
-  @*   <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
-        <FluentTextArea Rows="1" @bind-Value=DNS1>DNS</FluentTextArea>
-        <FluentTextArea Rows="1" @bind-Value=DNS2>DNS</FluentTextArea>
-        <FluentTextArea Rows="1" @bind-Value=DNS3>DNS</FluentTextArea>
-        <FluentTextArea Rows="1" @bind-Value=DNS4>DNS</FluentTextArea>
-        <FluentTextArea Rows="1" @bind-Value=DNS5>DNS</FluentTextArea>
-        <FluentTextArea Rows="1" @bind-Value=DNS6>DNS</FluentTextArea>
-    </FluentStack>
-
-    *@
 
     <FluentStack xs="12">
         <FluentButton IconStart="@(new Icons.Regular.Size16.GlobeArrowUp())" OnClick="() => AddDNSText()">AddDNS</FluentButton>

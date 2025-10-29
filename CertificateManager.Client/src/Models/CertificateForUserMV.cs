@@ -11,10 +11,10 @@ namespace CertificateManager.Client.src.Models
     public class CreateForCertificateMV : IViewModel, IAsyncDisposable
     {
         public event EventHandler<PropertyChangedEventArgs>? PropertyChanged;
-        private HttpClientFactoryCommon? _factory { get; init; }
+
         CancellationTokenSource? _source { get; init; } = new CancellationTokenSource();
         Serilog.ILogger _logger { get; init; }
-
+        private HttpClientFactoryCommon? _factory { get; init; }
         IJSRuntime _jsRuntime { get; init; }
 
         public CreateForCertificateMV(HttpClientFactoryCommon factory, Serilog.ILogger logger, IJSRuntime runtime)

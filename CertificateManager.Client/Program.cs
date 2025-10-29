@@ -55,6 +55,9 @@ namespace CertificateManager.Client
             builder.Services.AddSingleton(new AppData() { BaseUrl = uri });
             builder.Services.AddTransient<CertificateOvervieVM>();
             builder.Services.AddTransient<CreateForCertificateMV>();
+            builder.Services.AddTransient<CertificateUtilityVM>();
+
+
             builder.Services.AddTransient<ShaManager>();
             builder.Services.AddTransient<HelperMV>();
             builder.Services.AddSingleton<HttpClientFactoryCommon>();

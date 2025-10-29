@@ -1,0 +1,87 @@
+﻿@page "/certificateUtility"
+@using CertificateManager.Client.src.Models
+@using CertificateManager.src
+@using System.Text
+@using System.Reflection
+@using System.ComponentModel.DataAnnotations
+@inject IJSRuntime JSRuntime
+
+@inherits Page<CertificateUtilityVM>
+
+<h3>CertificateUtility</h3>
+
+<p>Seleziona un file (max 5 MB):</p>
+
+<FluentStack>
+    <div><InputFile OnChange="@(e => ViewModel?.HandleFileSelectedCRT(e, CertificateUtilityVM.CertificateUtilityTabs.CERT))">Certificate</InputFile></div>
+    <div>    <InputFile OnChange="@(e => ViewModel?.HandleFileSelectedCRT(e, CertificateUtilityVM.CertificateUtilityTabs.KEY))">KEY</InputFile></div>
+    <div>    <FluentTextField @bind-Value="ViewModel.Password" Type="password" Placeholder="Password" Label="Password"></FluentTextField></div>
+    <div>    <FluentTextField @bind-Value="ViewModel.PfxPassword" Type="password" Placeholder="Password" Label="Password"></FluentTextField></div>
+    <div>
+        <FluentButton OnClick="@CleanSelectedFiles" Appearance="Appearance.Accent">Clean</FluentButton>
+    </div>
+
+</FluentStack>
+
+<div>
+    <FluentLabel>@GenerateDisplayMarkup(ViewModel.LoadedCertificate)</FluentLabel>
+</div>
+
+<div>
+    <FluentButton OnClick="@ViewModel.DownloadPFX" Appearance="Appearance.Accent">Download PFX </FluentButton>
+</div>
+
+@code {
+    public void CleanSelectedFiles()
+    {
+        ViewModel.SelectedCertificate = null;
+        ViewModel.SelectedKey = null;
+        ViewModel.Password = string.Empty;
+        ViewModel.LoadedCertificate = null;
+
+        ViewModel.OnStateChange("clean the data");
+    }
+
+
+    public MarkupString GenerateDisplayMarkup(CertificateDetails? certificateDetails)
+    {
+        if (certificateDetails == null)
+        {
+            return (MarkupString)"<p>Dettagli certificato non disponibili.</p>";
+        }
+
+        var sb = new StringBuilder();
+        var properties = certificateDetails.GetType().GetProperties();
+
+        foreach (var prop in properties)
+        {
+            // 1. Ottiene il nome da visualizzare (usa DisplayName se presente)
+            string displayName = prop.GetCustomAttribute<DisplayAttribute>()?.Name ?? prop.Name;
+            
+            // 2. Ottiene il valore
+            object propertyValue = prop.GetValue(certificateDetails);
+
+            string displayValue;
+            if (propertyValue is DateTime dt)
+            {
+                // Formatta le date con fuso orario, se necessario, o un formato chiaro
+                displayValue = dt.ToString("dd/MM/yyyy HH:mm:ss"); 
+            }
+            else if (propertyValue is Enum enumValue)
+            {
+                displayValue = enumValue.ToString();
+            }
+            else
+            {
+                displayValue = propertyValue?.ToString() ?? "N/D"; 
+            }
+
+            // 3. Costruisci la riga con markup HTML (break line <br/> e grassetto <b>)
+            // Formato: NomeCampo: <b>Valore</b><br/>
+            sb.Append($"<p>{displayName}: <b>{displayValue}</b></p>");
+        }
+
+        // Converte la stringa StringBuilder in MarkupString
+        return (MarkupString)sb.ToString();
+    }
+}
