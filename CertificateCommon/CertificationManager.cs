@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
 using System.Net;
+using System.Runtime.ConstrainedExecution;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -148,6 +149,7 @@ namespace CertificateCommon
 
             return CreatePFX(serverCrtByteArray, serverKeyByteArray, secretKeyPassword, pfxPassword);
         }
+
         public byte[]? CreatePFX(byte[] serverCrt, byte[]? serverKey, string? secretKeyPassword, string pfxPassword)
         {
             if(serverCrt is null || serverCrt.Length == 0)
@@ -159,7 +161,6 @@ namespace CertificateCommon
             string certPem = Encoding.UTF8.GetString(serverCrt);
             if(serverKey is not null)
                 privateKey = Encoding.UTF8.GetString(serverKey);
-
 
             X509Certificate2 certificate;
 
@@ -330,6 +331,24 @@ namespace CertificateCommon
                     File.WriteAllText(certFileName, x509Son.ExportCertificatePem());//questa per CER
                     fileInfo.Add(new CertficateFileInfo(certFileName, x509Son));
 
+                    using ECDsa? ecKey = serverPfx.GetECDsaPrivateKey();
+
+                    if(ecKey != null)
+                    {
+                        // Esporta in formato PEM standard (quello che inizia con -----BEGIN PRIVATE KEY-----)
+                        string privateKeyPem = ecKey.ExportPkcs8PrivateKeyPem();
+
+                        string privateKeyFName = Path.Join(path, "private.key");
+
+                        File.WriteAllText(privateKeyFName, privateKeyPem);
+                        Logger?.Information("Private key generated: 'private.key'");
+                    }
+                    else
+                    {
+                        Logger?.Error("Impossibile to fix the private key files");
+                    }
+
+
                     string certFileNameRoot = Path.Join(path, "Root.crt");
                     fileInfo.Add(ExtractRoot(certFileNameRoot));
 
@@ -468,7 +487,7 @@ namespace CertificateCommon
             {
                 try
                 {
-                    var cert = serverRequest.Create(CARoot, DateTimeOffset.Now.AddDays(-1), CARoot.NotAfter, serialNumber);
+                    var cert = serverRequest.Create(CARoot, DateTimeOffset.Now, CARoot.NotAfter, serialNumber);
                     cert.FriendlyName = friendlyName;
                     return cert;
                 }
