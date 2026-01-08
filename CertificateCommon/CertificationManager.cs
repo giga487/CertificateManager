@@ -413,14 +413,31 @@ namespace CertificateCommon
                 throw new CARootWithouthPrivateKeyException();
             }
 
-            Oid? oid1 = null;
-
-            try
+            // Parse OID string - can contain multiple OIDs separated by comma
+            var oidCollection = new OidCollection();
+            
+            if (!string.IsNullOrEmpty(oid))
             {
-                oid1 = new Oid(oid);
+                var oids = oid.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var oidStr in oids)
+                {
+                    try
+                    {
+                        var trimmedOid = oidStr.Trim();
+                        oidCollection.Add(new Oid(trimmedOid));
+                    }
+                    catch
+                    {
+                        // Skip invalid OIDs
+                        Logger?.Warning($"Invalid OID: {oidStr}");
+                    }
+                }
             }
-            catch
+            
+            // If no valid OIDs were added, return null
+            if (oidCollection.Count == 0)
             {
+                Logger?.Warning("No valid OIDs provided");
                 return null;
             }
 
@@ -436,7 +453,7 @@ namespace CertificateCommon
             // Aggiungi le estensioni necessarie per un certificato server
             serverRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
             serverRequest.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
-            serverRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(new OidCollection { oid1 }, false));
+            serverRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(oidCollection, false));
             //var sanBuilder = new SubjectAlternativeNameBuilder();
 
             var san = new SubjectAlternativeNameBuilder();

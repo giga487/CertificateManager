@@ -17,7 +17,16 @@
         <FluentTextArea Rows="1" @bind-Value=Company>Company</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=CommonName>Common Name</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=Password>Password</FluentTextArea>
-        <FluentTextArea Rows="1" @bind-Value=OID>OID</FluentTextArea>
+    </FluentStack>
+
+    <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
+        <FluentLabel Weight="FontWeight.Bold">Certificate Usage (OID Selection):</FluentLabel>
+        <FluentCheckbox @bind-Value=ServerAuthentication>Server Authentication (HTTPS Server - 1.3.6.1.5.5.7.3.1)</FluentCheckbox>
+        <FluentCheckbox @bind-Value=ClientAuthentication>Client Authentication (mTLS Client - 1.3.6.1.5.5.7.3.2)</FluentCheckbox>
+        <FluentCheckbox @bind-Value=CodeSigning>Code Signing (1.3.6.1.5.5.7.3.3)</FluentCheckbox>
+        <FluentCheckbox @bind-Value=EmailProtection>Email Protection (1.3.6.1.5.5.7.3.4)</FluentCheckbox>
+        <FluentCheckbox @bind-Value=TimeStamping>Time Stamping (1.3.6.1.5.5.7.3.8)</FluentCheckbox>
+        <FluentCheckbox @bind-Value=OcspSigning>OCSP Signing (1.3.6.1.5.5.7.3.9)</FluentCheckbox>
     </FluentStack>
 
 
@@ -90,7 +99,73 @@
 
     public string IDString { get; set; } = "";
     public bool Created = false;
-    public string OID { get; set; } = "1.3.6.1.5.5.7.3.1";
+    
+    // OID Checkboxes
+    public bool ServerAuthentication { get; set; } = true; // Default for server
+    public bool ClientAuthentication { get; set; } = false;
+    public bool CodeSigning { get; set; } = false;
+    public bool EmailProtection { get; set; } = false;
+    public bool TimeStamping { get; set; } = false;
+    public bool OcspSigning { get; set; } = false;
+    
+    // Dictionary mapping checkbox properties to OID values
+    private Dictionary<string, string> OidMapping = new Dictionary<string, string>
+    {
+        { "ServerAuthentication", "1.3.6.1.5.5.7.3.1" },
+        { "ClientAuthentication", "1.3.6.1.5.5.7.3.2" },
+        { "CodeSigning", "1.3.6.1.5.5.7.3.3" },
+        { "EmailProtection", "1.3.6.1.5.5.7.3.4" },
+        { "TimeStamping", "1.3.6.1.5.5.7.3.8" },
+        { "OcspSigning", "1.3.6.1.5.5.7.3.9" }
+    };
+    
+    // Helper method to get selected OIDs
+    private string GetSelectedOids()
+    {
+        var selectedOids = new List<string>();
+        
+        if (ServerAuthentication) selectedOids.Add(OidMapping["ServerAuthentication"]);
+        if (ClientAuthentication) selectedOids.Add(OidMapping["ClientAuthentication"]);
+        if (CodeSigning) selectedOids.Add(OidMapping["CodeSigning"]);
+        if (EmailProtection) selectedOids.Add(OidMapping["EmailProtection"]);
+        if (TimeStamping) selectedOids.Add(OidMapping["TimeStamping"]);
+        if (OcspSigning) selectedOids.Add(OidMapping["OcspSigning"]);
+        
+        // Return comma-separated list, or default to Server Authentication if none selected
+        return selectedOids.Count > 0 ? string.Join(",", selectedOids) : "1.3.6.1.5.5.7.3.1";
+    }
+    
+    // Helper method to set checkboxes from OID string
+    private void SetOidCheckboxes(string? oid)
+    {
+        if (string.IsNullOrEmpty(oid))
+        {
+            ServerAuthentication = true;
+            return;
+        }
+        
+        // Reset all checkboxes
+        ServerAuthentication = false;
+        ClientAuthentication = false;
+        CodeSigning = false;
+        EmailProtection = false;
+        TimeStamping = false;
+        OcspSigning = false;
+        
+        // Parse OID string (can be comma-separated)
+        var oids = oid.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var oidValue in oids)
+        {
+            var trimmedOid = oidValue.Trim();
+            if (trimmedOid == "1.3.6.1.5.5.7.3.1") ServerAuthentication = true;
+            else if (trimmedOid == "1.3.6.1.5.5.7.3.2") ClientAuthentication = true;
+            else if (trimmedOid == "1.3.6.1.5.5.7.3.3") CodeSigning = true;
+            else if (trimmedOid == "1.3.6.1.5.5.7.3.4") EmailProtection = true;
+            else if (trimmedOid == "1.3.6.1.5.5.7.3.8") TimeStamping = true;
+            else if (trimmedOid == "1.3.6.1.5.5.7.3.9") OcspSigning = true;
+        }
+    }
+    
     // public string DNS1 { get; set; } = "";
     // public string DNS2 { get; set; } = "";
     // public string DNS3 { get; set; } = "";
@@ -133,8 +208,8 @@
             CommonName = cert.CN;
             Company = cert.Company;
 
-            if(!string.IsNullOrEmpty(cert.Oid))
-                OID = cert.Oid;
+            // Set OID checkboxes from certificate
+            SetOidCheckboxes(cert.Oid);
 
             foreach(var dns in cert.DNS)
             {
@@ -152,7 +227,8 @@
 
     public async void MakeCrt()
     {
-        var result = await ViewModel.Make(Company, CertificateAddress, OID, Solution, CommonName, Password, DNSStrings.ToArray());
+        var oid = GetSelectedOids();
+        var result = await ViewModel.Make(Company, CertificateAddress, oid, Solution, CommonName, Password, DNSStrings.ToArray());
 
         foreach(var res in result ?? new ())
         {
