@@ -413,12 +413,12 @@ namespace CertificateCommon
                 throw new CARootWithouthPrivateKeyException();
             }
 
-            // Parse OID string - can contain multiple OIDs separated by comma
+            // Parse OID string - can contain multiple OIDs separated by comma, semicolon, or space
             var oidCollection = new OidCollection();
             
             if (!string.IsNullOrEmpty(oid))
             {
-                var oids = oid.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                var oids = oid.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var oidStr in oids)
                 {
                     try
