@@ -272,7 +272,7 @@ namespace CertificateManager.src
 
         }
 
-        public void Add(string pfxFile, string oid, string company, string commonName, string crtRoot, string solution, string name, string password, string rootThumbprint, string address, string[] dns)
+        public void Add(string pfxFile, string oid, string company, string commonName, string crtRoot, string solution, string? name, string password, string rootThumbprint, string address, string[] dns)
         {
 
             CertificateComplete crt = new CertificateComplete()

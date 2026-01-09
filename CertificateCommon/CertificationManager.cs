@@ -357,7 +357,7 @@ namespace CertificateCommon
 
                     FileManager?.Add(commonName: commonName, company: company, oid: oid,
                         pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: solutionFolder, 
-                        name: name ?? "", password: exportPWD, rootThumbprint: CARoot.Thumbprint, address: serverAddress, dns: serverDNS);
+                        name: name, password: exportPWD, rootThumbprint: CARoot.Thumbprint, address: serverAddress, dns: serverDNS);
 
                 }
                 catch(Exception ex)
