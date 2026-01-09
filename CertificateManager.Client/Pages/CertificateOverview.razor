@@ -8,25 +8,67 @@
 
 <h2>Certificates List</h2>
 
-<FluentDataGrid Items="@ViewModel?.Certificates?.CertificatesDB.AsQueryable()">
-    <PropertyColumn Property="@(p => p.Id)" Sortable="true" Width="5%" />
-    <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="15%" />    
-    <PropertyColumn Property="@(p => p.Solution)" />
-    @* <PropertyColumn Property="@(p => p.CRTCertificate)" Sortable="true" Width="15%" />
-    <PropertyColumn Property="@(p => p.PFXCertificate)" Width="15%" /> *@
-    <PropertyColumn Property="@(p => p.Password)" Width="15%" />
-    <PropertyColumn Title = "DNS"   Property="@(p => string.Join(", ", p.DNS))" />
-    <PropertyColumn Property="@(p => p.Address)" />
-    <TemplateColumn Title="PFX">
-        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(context.Id))">Download</FluentButton>
-    </TemplateColumn>
-    <TemplateColumn Title="CA Root">
-        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
-    </TemplateColumn>
-    <TemplateColumn Title="Regenerate">
-        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(context.Id))">Modify</FluentButton>
-    </TemplateColumn>
-</FluentDataGrid>
+@if (ViewModel?.Certificates?.CertificatesDB != null && ViewModel.Certificates.CertificatesDB.Any())
+{
+    var solutionGroups = ViewModel.Certificates.CertificatesDB
+        .GroupBy(c => c.Solution ?? "Unknown")
+        .OrderBy(g => g.Key)
+        .ToList();
+
+    @if (solutionGroups.Count > 1)
+    {
+        <FluentTabs>
+            @foreach (var group in solutionGroups)
+            {
+                <FluentTab Label="@group.Key">
+                    <FluentDataGrid Items="@group.AsQueryable()">
+                        <PropertyColumn Property="@(p => p.Id)" Sortable="true" Width="5%" />
+                        <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="15%" />
+                        <PropertyColumn Property="@(p => p.Name)" Sortable="true" Title="Name" />
+                        <PropertyColumn Property="@(p => p.Password)" Width="10%" />
+                        <PropertyColumn Title="DNS" Property="@(p => string.Join(", ", p.DNS))" />
+                        <PropertyColumn Property="@(p => p.Address)" Width="10%" />
+                        <TemplateColumn Title="PFX" Width="8%">
+                            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(context.Id))">Download</FluentButton>
+                        </TemplateColumn>
+                        <TemplateColumn Title="CA Root" Width="8%">
+                            <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
+                        </TemplateColumn>
+                        <TemplateColumn Title="Regenerate" Width="8%">
+                            <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(context.Id))">Modify</FluentButton>
+                        </TemplateColumn>
+                    </FluentDataGrid>
+                </FluentTab>
+            }
+        </FluentTabs>
+    }
+    else
+    {
+        <!-- Single solution - no tabs needed -->
+        <FluentDataGrid Items="@ViewModel.Certificates.CertificatesDB.AsQueryable()">
+            <PropertyColumn Property="@(p => p.Id)" Sortable="true" Width="5%" />
+            <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="15%" />
+            <PropertyColumn Property="@(p => p.Solution)" Sortable="true" Title="Solution" />
+            <PropertyColumn Property="@(p => p.Name)" Sortable="true" Title="Name" />
+            <PropertyColumn Property="@(p => p.Password)" Width="10%" />
+            <PropertyColumn Title="DNS" Property="@(p => string.Join(", ", p.DNS))" />
+            <PropertyColumn Property="@(p => p.Address)" Width="10%" />
+            <TemplateColumn Title="PFX" Width="8%">
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(context.Id))">Download</FluentButton>
+            </TemplateColumn>
+            <TemplateColumn Title="CA Root" Width="8%">
+                <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
+            </TemplateColumn>
+            <TemplateColumn Title="Regenerate" Width="8%">
+                <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(context.Id))">Modify</FluentButton>
+            </TemplateColumn>
+        </FluentDataGrid>
+    }
+}
+else
+{
+    <p>No certificates found.</p>
+}
 
 
 
