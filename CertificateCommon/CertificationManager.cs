@@ -287,7 +287,7 @@ namespace CertificateCommon
             }
         }
 
-        public List<CertficateFileInfo> CreatingPFX_CRT(string? commonName, string? oid, string? serverAddress, string? company, string? exportPWD, DateTimeOffset expiring, string? solutionFolder, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt", params string[] serverDNS)
+        public List<CertficateFileInfo> CreatingPFX_CRT(string? commonName, string? oid, string? serverAddress, string? company, string? exportPWD, DateTimeOffset expiring, string? solutionFolder, string? name = null, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt", params string[] serverDNS)
         {
             List<CertficateFileInfo> fileInfo = new List<CertficateFileInfo>();
             using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256); // Uso di ECDsa come da te suggerito
@@ -309,7 +309,10 @@ namespace CertificateCommon
                 Logger?.Information($"Created: {x509Son}");
             }
 
-            string path = Path.Combine(_dir, solutionFolder);
+            // Build path: Output/Solution/Name or Output/Solution if Name is not provided
+            string path = string.IsNullOrEmpty(name) 
+                ? Path.Combine(_dir, solutionFolder)
+                : Path.Combine(_dir, solutionFolder, name);
 
             if(!Directory.Exists(path))
             {
@@ -354,7 +357,7 @@ namespace CertificateCommon
 
                     FileManager?.Add(commonName: commonName, company: company, oid: oid,
                         pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: solutionFolder, 
-                        password: exportPWD, rootThumbprint: CARoot.Thumbprint, address: serverAddress, dns: serverDNS);
+                        name: name ?? "", password: exportPWD, rootThumbprint: CARoot.Thumbprint, address: serverAddress, dns: serverDNS);
 
                 }
                 catch(Exception ex)

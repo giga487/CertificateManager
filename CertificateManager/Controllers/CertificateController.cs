@@ -78,6 +78,7 @@ namespace CertificateManager.Controllers
                     exportPWD: certificate.Password,
                     expiring: DateTimeOffset.Now + TimeSpan.FromDays(3650),
                     solutionFolder: certificate.Solution,
+                    name: certificate.Name,
                     serverDNS: certificate.DNS);
 
                 return Ok(result);

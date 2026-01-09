@@ -13,11 +13,13 @@
 
     <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
         <FluentTextArea Rows="1" @bind-Value=Solution>Solution</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Name>Name (optional)</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=CertificateAddress>Address</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=Company>Company</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=CommonName>Common Name</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=Password>Password</FluentTextArea>
     </FluentStack>
+
 
     <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
         <FluentLabel Weight="FontWeight.Bold">Certificate Usage (OID Selection) / Utilizzo Certificato (Selezione OID):</FluentLabel>
@@ -251,6 +253,7 @@
     public int ID { get; set; } = -1;
 
     string Solution { get; set; } = "APP_X";
+    string Name { get; set; } = ""; // Human-friendly name for certificate organization
     string CertificateAddress { get; set; } = "localhost";
     string Company { get; set; } = "NXT";
     string CommonName { get; set; } = "server";
@@ -558,6 +561,7 @@
             var cert = await ViewModel.GetCertificateID(ID);
 
             Solution = cert.Solution;
+            Name = cert.Name ?? "";
             Password = cert.Password;
             CertificateAddress = cert.Address;
             CommonName = cert.CN;
@@ -583,7 +587,7 @@
     public async void MakeCrt()
     {
         var oid = GetSelectedOids();
-        var result = await ViewModel.Make(Company, CertificateAddress, oid, Solution, CommonName, Password, DNSStrings.ToArray());
+        var result = await ViewModel.Make(Company, CertificateAddress, oid, Solution, Name, CommonName, Password, DNSStrings.ToArray());
 
         foreach(var res in result ?? new ())
         {
