@@ -161,11 +161,13 @@ namespace CertificateManager.src
         }
     }
 
-    public class FileManagerCertificate
+    public class FileManagerCertificate : IDisposable
     {
         public string? _dbCertificates { get; init; }    
         DirectoryInfo? _dir { get; init; }
         Serilog.ILogger? _logger { get; init; }
+
+        private ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
 
         public ShaManager ShaManager => _shaManager;
         private ShaManager _shaManager { get; init; }
@@ -186,7 +188,21 @@ namespace CertificateManager.src
         }
 
         CertificateDB? _lastJSonMemory { get; set; }
-        public CertificateDB? JSONMemory => _lastJSonMemory;
+        public CertificateDB? JSONMemory 
+        { 
+            get
+            {
+                _lock.EnterReadLock();
+                try
+                {
+                    return _lastJSonMemory;
+                }
+                finally
+                {
+                    _lock.ExitReadLock();
+                }
+            } 
+        }
 
         JsonSerializerOptions _options = new JsonSerializerOptions
         {
@@ -212,9 +228,17 @@ namespace CertificateManager.src
 
         public string HashFileBy(string solution, CertificateTypes type)
         {
-            if(_lastJSonMemory?.GetIDBySolution(solution, out int? id) ?? false)
+            _lock.EnterReadLock();
+            try
             {
-                return HashFileBy(id ?? -1, type);
+                if(_lastJSonMemory?.GetIDBySolution(solution, out int? id) ?? false)
+                {
+                    return HashFileBy(id ?? -1, type);
+                }
+            }
+            finally
+            {
+                _lock.ExitReadLock();
             }
 
             return string.Empty;
@@ -222,24 +246,32 @@ namespace CertificateManager.src
 
         public Dictionary<CertificateTypes, string>? RetrieveCertificates(int id)
         {
-            Dictionary<CertificateTypes, string> files = new Dictionary<CertificateTypes, string>();
-            var dataFound = _lastJSonMemory?.CertificatesDB.Find(t => t.Id == id);
-
-            if(dataFound is null)
-                return null;
-
-
-            if(!string.IsNullOrEmpty(dataFound.PFXCertificate))
+            _lock.EnterReadLock();
+            try
             {
-                files[CertificateTypes.PFX] = dataFound.PFXCertificate;// System.IO.File.OpenRead(dataFound.PFXCertificate);
-            }
+                Dictionary<CertificateTypes, string> files = new Dictionary<CertificateTypes, string>();
+                var dataFound = _lastJSonMemory?.CertificatesDB.Find(t => t.Id == id);
 
-            if(!string.IsNullOrEmpty(dataFound.CRTCertificate))
+                if(dataFound is null)
+                    return null;
+
+
+                if(!string.IsNullOrEmpty(dataFound.PFXCertificate))
+                {
+                    files[CertificateTypes.PFX] = dataFound.PFXCertificate;
+                }
+
+                if(!string.IsNullOrEmpty(dataFound.CRTCertificate))
+                {
+                    files[CertificateTypes.CARootNoKey] = dataFound.CRTCertificate;
+                }
+
+                return files;
+            }
+            finally
             {
-                files[CertificateTypes.CARootNoKey] = dataFound.CRTCertificate; // System.IO.File.OpenRead(dataFound.CRTCertificate);
+                _lock.ExitReadLock();
             }
-
-            return files;
         }
 
         public void Load()
@@ -250,6 +282,7 @@ namespace CertificateManager.src
                 return;
             }
 
+            _lock.EnterWriteLock();
             try
             {
                 var jsonString = File.ReadAllText(_dbCertificates);
@@ -268,35 +301,59 @@ namespace CertificateManager.src
             {
                 _logger?.Warning($"Impossibile to load {_dbCertificates} -> {ex.Message}");
             }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
 
         }
 
         public void Add(string pfxFile, string oid, string company, string commonName, string crtRoot, string solution, string password, string rootThumbprint, string address, string[] dns)
         {
-
-            CertificateComplete crt = new CertificateComplete()
+            _lock.EnterWriteLock();
+            try
             {
-                CRTCertificate = crtRoot,
-                PFXCertificate = pfxFile,
-                CN = commonName,
-                Company = company,  
-                Solution = solution,
-                Password = password,
-                Id = _lastJSonMemory?.MaxId + 1,
-                RootThumbPrint = rootThumbprint,
-                Address = address,
-                DNS = dns,
-                Oid = oid
-            };
+                CertificateComplete crt = new CertificateComplete()
+                {
+                    CRTCertificate = crtRoot,
+                    PFXCertificate = pfxFile,
+                    CN = commonName,
+                    Company = company,  
+                    Solution = solution,
+                    Password = password,
+                    Id = (_lastJSonMemory?.MaxId ?? 0) + 1,
+                    RootThumbPrint = rootThumbprint,
+                    Address = address,
+                    DNS = dns,
+                    Oid = oid
+                };
 
-            crt.LoadCertificate();
+                crt.LoadCertificate();
 
-            _lastJSonMemory?.Add(solution, crt);
+                _lastJSonMemory?.Add(solution, crt);
 
-            Save();
+                SaveInternal();
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
         }
 
         public void Save()
+        {
+            _lock.EnterWriteLock();
+            try
+            {
+                SaveInternal();
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
+        private void SaveInternal()
         {
             if(string.IsNullOrEmpty(_dbCertificates))
             {
@@ -306,6 +363,13 @@ namespace CertificateManager.src
             var jsonString = JsonSerializer.Serialize(_lastJSonMemory, _options);
             File.WriteAllText(_dbCertificates, jsonString);
         }
+        
+        // RE-WRITING IMPLEMENTATION FOR `Add` and `Save` to handle locks correctly without recursion.
+        // See below in logic.
 
+        public void Dispose()
+        {
+             _lock?.Dispose();
+        }
     }
 }
