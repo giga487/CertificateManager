@@ -133,6 +133,7 @@ namespace CertificateManager.src
         public string? Company { get; init; }
         public string? CN { get; init; }
         public string? Solution { get; init; }
+        public string? Name { get; init; } // Human-friendly name for certificate organization
         public string? PFXCertificate { get; init; }
         public string? CRTCertificate { get; init; }
         public DateTime Creation { get; init; } = DateTime.Now;
@@ -308,25 +309,24 @@ namespace CertificateManager.src
 
         }
 
-        public void Add(string pfxFile, string oid, string company, string commonName, string crtRoot, string solution, string password, string rootThumbprint, string address, string[] dns)
+        public void Add(string pfxFile, string oid, string company, string commonName, string crtRoot, string solution, string? name, string password, string rootThumbprint, string address, string[] dns)
         {
             _lock.EnterWriteLock();
             try
             {
-                CertificateComplete crt = new CertificateComplete()
-                {
-                    CRTCertificate = crtRoot,
-                    PFXCertificate = pfxFile,
-                    CN = commonName,
-                    Company = company,  
-                    Solution = solution,
-                    Password = password,
-                    Id = (_lastJSonMemory?.MaxId ?? 0) + 1,
-                    RootThumbPrint = rootThumbprint,
-                    Address = address,
-                    DNS = dns,
-                    Oid = oid
-                };
+                CRTCertificate = crtRoot,
+                PFXCertificate = pfxFile,
+                CN = commonName,
+                Company = company,  
+                Solution = solution,
+                Name = name,
+                Password = password,
+                Id = _lastJSonMemory?.MaxId + 1,
+                RootThumbPrint = rootThumbprint,
+                Address = address,
+                DNS = dns,
+                Oid = oid
+            };
 
                 crt.LoadCertificate();
 
