@@ -29,6 +29,10 @@
 
 <div>
     <FluentButton OnClick="@ViewModel.DownloadPFX" Appearance="Appearance.Accent">Download PFX </FluentButton>
+    @if (!string.IsNullOrEmpty(ViewModel.ErrorMessage))
+    {
+        <p style="color: var(--error);">@ViewModel.ErrorMessage</p>
+    }
 </div>
 
 @code {

@@ -314,19 +314,21 @@ namespace CertificateManager.src
             _lock.EnterWriteLock();
             try
             {
-                CRTCertificate = crtRoot,
-                PFXCertificate = pfxFile,
-                CN = commonName,
-                Company = company,  
-                Solution = solution,
-                Name = name,
-                Password = password,
-                Id = _lastJSonMemory?.MaxId + 1,
-                RootThumbPrint = rootThumbprint,
-                Address = address,
-                DNS = dns,
-                Oid = oid
-            };
+                var crt = new CertificateComplete
+                {
+                    CRTCertificate = crtRoot,
+                    PFXCertificate = pfxFile,
+                    CN = commonName,
+                    Company = company,
+                    Solution = solution,
+                    Name = name,
+                    Password = password,
+                    Id = (_lastJSonMemory?.MaxId ?? 0) + 1,
+                    RootThumbPrint = rootThumbprint,
+                    Address = address,
+                    DNS = dns,
+                    Oid = oid
+                };
 
                 crt.LoadCertificate();
 

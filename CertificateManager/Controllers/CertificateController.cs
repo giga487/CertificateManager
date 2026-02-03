@@ -115,14 +115,18 @@ namespace CertificateManager.Controllers
             {
                 byte[] certificateData = await _certificationManager!.CreatePFX(crtFile, key, password, pfxPassword) ?? new byte[0];
 
+                if (certificateData.Length == 0)
+                {
+                    return BadRequest("Failed to generate PFX. The result was empty. Check if the private key matches the certificate.");
+                }
+
                 return File(certificateData, "application/x-x509-ca-cert", "Certificate.pfx");
             }
             catch(Exception ex)
             {
                 _logger?.Warning($"Error creating PFX from CRT: {ex.Message}");
+                return BadRequest($"Error creating PFX: {ex.Message}");
             }
-
-            return BadRequest("Not able to create PFX from CRT");
         }
 
 

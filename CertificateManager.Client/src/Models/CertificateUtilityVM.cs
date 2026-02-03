@@ -22,6 +22,7 @@ namespace CertificateManager.Client.src.Models
         public IBrowserFile? SelectedKey { get; set; }
         public string Password { get; set; }
         public string PfxPassword { get; set; }
+        public string? ErrorMessage { get; set; }
 
         public CertificateUtilityVM(HttpClientFactoryCommon factory, Serilog.ILogger logger, IJSRuntime runtime)
         {
@@ -49,12 +50,15 @@ namespace CertificateManager.Client.src.Models
 
         public async void DownloadPFX()
         {
-
+            ErrorMessage = null;
+            OnStateChange("Reset Error");
             try
             {
                 if(SelectedCertificate is null || string.IsNullOrEmpty(PfxPassword) || SelectedKey is null)
                 {
-                    _logger?.Warning("Some input is not valid");
+                    ErrorMessage = "Some input is not valid";
+                    _logger?.Warning(ErrorMessage);
+                    OnStateChange("Input Error");
                     return;
                 }
 
@@ -72,7 +76,10 @@ namespace CertificateManager.Client.src.Models
 
                     if(response is null || !response.IsSuccessStatusCode)
                     {
-                        _logger?.Warning("Error creating PFX file");
+                        string errorDetails = response != null ? await response.Content.ReadAsStringAsync() : "No response";
+                        ErrorMessage = $"Error creating PFX file: {errorDetails}";
+                        _logger?.Warning(ErrorMessage);
+                        OnStateChange("Server Error");
                         return;
                     }
 
@@ -83,7 +90,9 @@ namespace CertificateManager.Client.src.Models
             }
             catch(Exception ex)
             {
-                _logger?.Warning($"Download PFX cancelled: {ex.Message}");
+                ErrorMessage = $"Download PFX cancelled: {ex.Message}";
+                _logger?.Warning(ErrorMessage);
+                OnStateChange("Exception Error");
             }
         }
 

@@ -21,3 +21,4 @@ CertificateManager/appsettings.json
 /CertificateManager/Output
 OpenSSLScript/create_COUPLE_CRT_KEY.cmd
 /OpenSSLScript
+/.agent

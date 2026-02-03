@@ -55,6 +55,7 @@ namespace UT
                             commonName: $"CN_{id}", 
                             crtRoot: "root", 
                             solution: $"Sol_{id}", 
+                            name: $"Name_{id}",
                             password: "pass", 
                             rootThumbprint: "thumb", 
                             address: "127.0.0.1", 

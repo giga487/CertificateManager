@@ -103,17 +103,22 @@ namespace CertificateCommon
             return new CertficateFileInfo(certFileName, CARoot);
 
         }
-        public async Task<byte[]?> ConvertIFormFileToByteArrayAsync(IFormFile file)
+        public virtual async Task<byte[]?> ConvertIFormFileToByteArrayAsync(IFormFile file)
         {
+            if (file == null)
+            {
+                Logger?.Warning("Input file is null");
+                return null;
+            }
 
             try
             {
-                using(var memoryStream = new MemoryStream())
+                using (var memoryStream = new MemoryStream())
                 {
                     // 2. Open the read stream from the IFormFile
                     // In a real application, consider adding a size limit here: 
                     // using (var fileStream = file.OpenReadStream(maxAllowedSize))
-                    using(var fileStream = file.OpenReadStream())
+                    using (var fileStream = file.OpenReadStream())
                     {
                         // 3. Asynchronously copy the content from the file stream 
                         //    to the memory stream. This is efficient for I/O operations.
@@ -128,8 +133,9 @@ namespace CertificateCommon
                     return memoryStream.ToArray();
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                Logger?.Error($"Error converting file to byte array: {ex.Message}");
                 return null;
             }
         }
@@ -152,34 +158,68 @@ namespace CertificateCommon
 
         public byte[]? CreatePFX(byte[] serverCrt, byte[]? serverKey, string? secretKeyPassword, string pfxPassword)
         {
-            if(serverCrt is null || serverCrt.Length == 0)
+            if (serverCrt is null || serverCrt.Length == 0)
             {
                 return null;
             }
 
             string privateKey = "";
             string certPem = Encoding.UTF8.GetString(serverCrt);
-            if(serverKey is not null)
+            if (serverKey is not null)
                 privateKey = Encoding.UTF8.GetString(serverKey);
 
             X509Certificate2 certificate;
 
-            if(!string.IsNullOrEmpty(secretKeyPassword) && !string.IsNullOrEmpty(privateKey))
+            if (!string.IsNullOrEmpty(secretKeyPassword) && !string.IsNullOrEmpty(privateKey))
             {
                 certificate = X509Certificate2.CreateFromEncryptedPem(certPem, privateKey, secretKeyPassword);
             }
-            else if(!string.IsNullOrEmpty(privateKey))
+            else if (!string.IsNullOrEmpty(privateKey))
             {
                 certificate = X509Certificate2.CreateFromPem(certPem, privateKey);
             }
             else
             {
-
                 return null;
             }
 
-            return certificate.Export(X509ContentType.Pfx, pfxPassword);
+            // Create a collection to hold the final PFX certificates
+            X509Certificate2Collection collection = new X509Certificate2Collection();
             
+            // Import all certificates found in the PEM (this captures the chain)
+            X509Certificate2Collection chainParam = new X509Certificate2Collection();
+            try
+            {
+                chainParam.ImportFromPem(certPem);
+            }
+            catch (Exception ex)
+            {
+                Logger?.Warning($"Error parsing chain from PEM: {ex.Message}. Proceeding with single certificate.");
+            }
+
+            bool mainCertAdded = false;
+
+            // Merge: Use the certificate with the private key for the matching thumbprint
+            foreach (var cert in chainParam)
+            {
+                if (cert.Thumbprint == certificate.Thumbprint)
+                {
+                    collection.Add(certificate); // Add the one with Private Key
+                    mainCertAdded = true;
+                }
+                else
+                {
+                    collection.Add(cert); // Add intermediate/root
+                }
+            }
+
+            // Fallback: If for some reason the main cert wasn't in the loaded chain (unlikely), add it
+            if (!mainCertAdded)
+            {
+                collection.Add(certificate);
+            }
+
+            return collection.Export(X509ContentType.Pfx, pfxPassword);
         }
 
 
