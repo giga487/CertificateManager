@@ -22,7 +22,7 @@
     </FluentStack>
 
     <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
-        <FluentTextArea Rows="1" @bind-Value=ApplicationUri>Application URI</FluentTextArea>
+        <FluentTextArea Style="width:30%" Rows="1" @bind-Value=ApplicationUri>Application URI</FluentTextArea>
     </FluentStack>
 
     <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
@@ -46,6 +46,7 @@
     <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
         <FluentLabel Weight="FontWeight.Bold">Private Key Algorithm</FluentLabel>
         <select class="oid-filter-input" @bind="KeyAlgorithm">
+            <option value="@CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot">Auto (CA Root algorithm)</option>
             <option value="@CertificatePrivateKeyAlgorithm.Rsa2048">RSA 2048</option>
             <option value="@CertificatePrivateKeyAlgorithm.Rsa3072">RSA 3072</option>
             <option value="@CertificatePrivateKeyAlgorithm.Rsa4096">RSA 4096</option>
@@ -185,7 +186,7 @@
     string ApplicationUri { get; set; } = "urn:localhost:NXT:server";
     DateTime? ValidFrom { get; set; } = DateTime.UtcNow.Date;
     DateTime? ValidTo { get; set; } = DateTime.UtcNow.Date.AddYears(10);
-    CertificatePrivateKeyAlgorithm KeyAlgorithm { get; set; } = CertificatePrivateKeyAlgorithm.Rsa2048;
+    CertificatePrivateKeyAlgorithm KeyAlgorithm { get; set; } = CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot;
 
     string MakeOutput { get; set; } = "";
 
@@ -649,13 +650,14 @@
     {
         return Enum.TryParse<CertificatePrivateKeyAlgorithm>(keyAlgorithm, ignoreCase: true, out var parsed)
             ? parsed
-            : CertificatePrivateKeyAlgorithm.Rsa2048;
+            : CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot;
     }
 
     private static string FormatKeyAlgorithm(string? keyAlgorithm)
     {
         return keyAlgorithm switch
         {
+            nameof(CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot) => "Auto (CA Root algorithm)",
             nameof(CertificatePrivateKeyAlgorithm.Rsa2048) => "RSA 2048",
             nameof(CertificatePrivateKeyAlgorithm.Rsa3072) => "RSA 3072",
             nameof(CertificatePrivateKeyAlgorithm.Rsa4096) => "RSA 4096",

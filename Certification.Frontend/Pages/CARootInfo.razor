@@ -1,0 +1,102 @@
+@page "/ca-root"
+@using CertificateManager.Client.src.Models
+
+@inherits Page<CARootInfoVM>
+
+<PageTitle>CA Root</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" HorizontalGap="12" Class="ca-root-page">
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalAlignment="HorizontalAlignment.SpaceBetween" VerticalAlignment="VerticalAlignment.Center" Class="ca-root-header">
+        <h2>CA Root</h2>
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+            <FluentButton IconStart="@(new Icons.Regular.Size16.ArrowClockwise())" OnClick="LoadInfo">Refresh</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" IconStart="@(new Icons.Regular.Size16.ArrowDownload())" OnClick="DownloadRoot" Disabled="@(ViewModel?.Info is null)">Download CRT</FluentButton>
+        </FluentStack>
+    </FluentStack>
+
+    @if(ViewModel?.IsLoading ?? true)
+    {
+        <FluentProgressRing />
+    }
+    else if(!string.IsNullOrWhiteSpace(ViewModel?.ErrorMessage))
+    {
+        <FluentMessageBar Intent="MessageIntent.Error">@ViewModel.ErrorMessage</FluentMessageBar>
+    }
+    else if(ViewModel?.Info is not null)
+    {
+        var info = ViewModel.Info;
+
+        <section class="ca-root-summary">
+            <div>
+                <span class="ca-root-label">Subject</span>
+                <strong>@info.Subject</strong>
+            </div>
+            <div>
+                <span class="ca-root-label">Status</span>
+                <strong>@(info.IsExpired ? "Expired" : "Valid")</strong>
+            </div>
+            <div>
+                <span class="ca-root-label">Private Key</span>
+                <strong>@(info.HasPrivateKey ? "Available" : "Missing")</strong>
+            </div>
+            <div>
+                <span class="ca-root-label">Algorithm</span>
+                <strong>@FormatAlgorithm(info.PublicKeyAlgorithm, info.PublicKeySize)</strong>
+            </div>
+        </section>
+
+        <section class="ca-root-details">
+            <InfoRow Label="Issuer" Value="@info.Issuer" />
+            <InfoRow Label="Thumbprint" Value="@info.Thumbprint" IsMono="true" />
+            <InfoRow Label="Configured Thumbprint" Value="@info.ConfiguredThumbprint" IsMono="true" />
+            <InfoRow Label="Serial Number" Value="@info.SerialNumber" IsMono="true" />
+            <InfoRow Label="Valid From" Value="@FormatDate(info.NotBefore)" />
+            <InfoRow Label="Valid To" Value="@FormatDate(info.NotAfter)" />
+            <InfoRow Label="Days To Expiration" Value="@info.DaysToExpiration.ToString()" />
+            <InfoRow Label="CA Certificate" Value="@(info.IsCertificateAuthority ? "Yes" : "No")" />
+            <InfoRow Label="Signature Algorithm" Value="@info.SignatureAlgorithm" />
+            <InfoRow Label="Version" Value="@info.Version.ToString()" />
+            <InfoRow Label="Key Usage" Value="@FormatList(info.KeyUsages)" />
+            <InfoRow Label="Enhanced Key Usage" Value="@FormatList(info.EnhancedKeyUsages)" />
+        </section>
+    }
+</FluentStack>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await LoadInfo();
+    }
+
+    private async Task LoadInfo()
+    {
+        if(ViewModel is not null)
+        {
+            await ViewModel.Load();
+        }
+    }
+
+    private async Task DownloadRoot()
+    {
+        if(ViewModel is not null)
+        {
+            await ViewModel.Download();
+        }
+    }
+
+    private static string FormatAlgorithm(string? algorithm, int? keySize)
+    {
+        return keySize is null ? algorithm ?? string.Empty : $"{algorithm} ({keySize} bit)";
+    }
+
+    private static string FormatDate(DateTime value)
+    {
+        return value.ToString("yyyy-MM-dd HH:mm:ss");
+    }
+
+    private static string FormatList(string[] values)
+    {
+        return values.Length == 0 ? "-" : string.Join(", ", values);
+    }
+}

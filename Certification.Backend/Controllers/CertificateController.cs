@@ -1,4 +1,5 @@
 using CertificateManager.src;
+using CertificateCommon;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Certification.Backend.Controllers
@@ -90,6 +91,32 @@ namespace Certification.Backend.Controllers
 		public IActionResult Info()
 		{
 			return Ok(CertificationManager.FileManager?.JSONMemory);
+		}
+
+		[HttpGet("CARootInfo")]
+		public IActionResult CARootInfo()
+		{
+			try
+			{
+				return Ok(CertificationManager.GetCertificateAuthorityInfo());
+			}
+			catch(CARootNotFoundException ex)
+			{
+				Logger?.Warning($"CA root info unavailable: {ex.Message}");
+				return NotFound(ex.Message);
+			}
+		}
+
+		[HttpGet("downloadCARoot")]
+		public IActionResult DownloadCARoot()
+		{
+			if(CertificationManager.CARoot is null)
+			{
+				return NotFound("No CA Root configured");
+			}
+
+			var data = System.Text.Encoding.UTF8.GetBytes(CertificationManager.CARoot.ExportCertificatePem());
+			return File(data, "application/octet-stream", "FCNXTCA.crt");
 		}
 
 		[HttpPost("CreatePFXFromCRT")]

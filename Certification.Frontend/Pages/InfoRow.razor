@@ -1,0 +1,22 @@
+<div class="ca-root-row">
+    <span class="ca-root-label">@Label</span>
+    @if(IsMono)
+    {
+        <code>@Value</code>
+    }
+    else
+    {
+        <span>@Value</span>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = "";
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public bool IsMono { get; set; }
+}

@@ -11,3 +11,4 @@
 CACertificate.ps1
 /.agent
 /OpenSSLScript/*
+/artifacts

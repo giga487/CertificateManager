@@ -130,6 +130,38 @@ namespace CertificateCommon
             return new CertficateFileInfo(certFileName, CARoot);
 
         }
+
+        public CertificateAuthorityInfo GetCertificateAuthorityInfo()
+        {
+            if(CARoot is null)
+            {
+                throw new CARootNotFoundException();
+            }
+
+            var now = DateTime.UtcNow;
+            var notAfterUtc = CARoot.NotAfter.ToUniversalTime();
+
+            return new CertificateAuthorityInfo
+            {
+                ConfiguredThumbprint = CARootThumbprint,
+                Subject = CARoot.Subject,
+                Issuer = CARoot.Issuer,
+                Thumbprint = CARoot.Thumbprint,
+                SerialNumber = CARoot.SerialNumber,
+                NotBefore = CARoot.NotBefore,
+                NotAfter = CARoot.NotAfter,
+                DaysToExpiration = (int)Math.Floor((notAfterUtc - now).TotalDays),
+                IsExpired = notAfterUtc <= now,
+                HasPrivateKey = CARoot.HasPrivateKey,
+                IsCertificateAuthority = IsCertificateAuthority(CARoot),
+                PublicKeyAlgorithm = CARoot.PublicKey.Oid.FriendlyName ?? CARoot.PublicKey.Oid.Value,
+                PublicKeySize = GetPublicKeySize(CARoot),
+                SignatureAlgorithm = CARoot.SignatureAlgorithm.FriendlyName ?? CARoot.SignatureAlgorithm.Value,
+                Version = CARoot.Version,
+                KeyUsages = GetKeyUsageNames(CARoot),
+                EnhancedKeyUsages = GetEnhancedKeyUsageNames(CARoot)
+            };
+        }
         public virtual async Task<byte[]?> ConvertIFormFileToByteArrayAsync(IFormFile file)
         {
             if (file == null)
@@ -321,6 +353,59 @@ namespace CertificateCommon
             return extension != null ? extension.KeyUsages : X509KeyUsageFlags.None;
         }
 
+        private static bool IsCertificateAuthority(X509Certificate2 cert)
+        {
+            return cert.Extensions
+                .OfType<X509BasicConstraintsExtension>()
+                .Any(extension => extension.CertificateAuthority);
+        }
+
+        private static int? GetPublicKeySize(X509Certificate2 cert)
+        {
+            using var rsa = cert.GetRSAPublicKey();
+            if(rsa is not null)
+            {
+                return rsa.KeySize;
+            }
+
+            using var ecdsa = cert.GetECDsaPublicKey();
+            if(ecdsa is not null)
+            {
+                return ecdsa.KeySize;
+            }
+
+            return null;
+        }
+
+        private static string[] GetKeyUsageNames(X509Certificate2 cert)
+        {
+            var extension = cert.Extensions.OfType<X509KeyUsageExtension>().FirstOrDefault();
+            if(extension is null || extension.KeyUsages == X509KeyUsageFlags.None)
+            {
+                return [];
+            }
+
+            return Enum.GetValues<X509KeyUsageFlags>()
+                .Where(flag => flag != X509KeyUsageFlags.None && extension.KeyUsages.HasFlag(flag))
+                .Select(flag => flag.ToString())
+                .ToArray();
+        }
+
+        private static string[] GetEnhancedKeyUsageNames(X509Certificate2 cert)
+        {
+            var extension = cert.Extensions.OfType<X509EnhancedKeyUsageExtension>().FirstOrDefault();
+            if(extension is null)
+            {
+                return [];
+            }
+
+            return extension.EnhancedKeyUsages
+                .Cast<Oid>()
+                .Select(oid => string.IsNullOrWhiteSpace(oid.FriendlyName) ? oid.Value ?? string.Empty : $"{oid.FriendlyName} ({oid.Value})")
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+        }
+
 
 
         public class CertficateFileInfo
@@ -367,12 +452,13 @@ namespace CertificateCommon
             }
 
             List<CertficateFileInfo> fileInfo = new List<CertficateFileInfo>();
-            using var serverKey = CreatePrivateKey(request.KeyAlgorithm);
-
             if(CARoot is null)
             {
                 throw new CARootNotFoundException();
             }
+
+            var resolvedKeyAlgorithm = ResolvePrivateKeyAlgorithm(request.KeyAlgorithm, CARoot);
+            using var serverKey = CreatePrivateKey(resolvedKeyAlgorithm);
 
             X509Certificate2? x509Son = CreateCertificate(request, serverKey, CARoot, isCertificateAuthority: false);
 
@@ -403,17 +489,17 @@ namespace CertificateCommon
                 {
                     string pfxFileName = Path.Join(path, pfxName);
                     File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, request.PfxPassword));
-                    fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son, request.KeyAlgorithm.ToString(), request.ApplicationUri));
+                    fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son, resolvedKeyAlgorithm.ToString(), request.ApplicationUri));
 
                     string certFileName = Path.Join(path, certName);
 
                     //File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));//questa per CER
                     File.WriteAllText(certFileName, x509Son.ExportCertificatePem());//questa per CER
-                    fileInfo.Add(new CertficateFileInfo(certFileName, x509Son, request.KeyAlgorithm.ToString(), request.ApplicationUri));
+                    fileInfo.Add(new CertficateFileInfo(certFileName, x509Son, resolvedKeyAlgorithm.ToString(), request.ApplicationUri));
 
                     string derFileName = Path.Join(path, "Certificate.der");
                     File.WriteAllBytes(derFileName, x509Son.Export(X509ContentType.Cert));
-                    fileInfo.Add(new CertficateFileInfo(derFileName, x509Son, request.KeyAlgorithm.ToString(), request.ApplicationUri));
+                    fileInfo.Add(new CertficateFileInfo(derFileName, x509Son, resolvedKeyAlgorithm.ToString(), request.ApplicationUri));
 
                     if(request.ExportPrivateKeyPem)
                     {
@@ -432,7 +518,7 @@ namespace CertificateCommon
                         pfxFile: pfxFileName, crtRoot: certFileNameRoot, derFile: derFileName, solution: request.Solution!,
                         name: request.Name, password: request.PfxPassword!, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), applicationUri: request.ApplicationUri, dns: request.DnsNames,
                         ipAddresses: request.IpAddresses, organizationalUnit: request.OrganizationalUnit, locality: request.Locality, state: request.State,
-                        country: request.Country, validFromUtc: request.ValidFromUtc, validToUtc: request.ValidToUtc, keyUsages: request.KeyUsages, keyAlgorithm: request.KeyAlgorithm.ToString(),
+                        country: request.Country, validFromUtc: request.ValidFromUtc, validToUtc: request.ValidToUtc, keyUsages: request.KeyUsages, keyAlgorithm: resolvedKeyAlgorithm.ToString(),
                         signatureHashAlgorithm: request.SignatureHashAlgorithm);
 
                 }
@@ -650,6 +736,37 @@ namespace CertificateCommon
                 CertificatePrivateKeyAlgorithm.Rsa4096 => RSA.Create(4096),
                 _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm, "Unsupported private key algorithm.")
             };
+        }
+
+        private static CertificatePrivateKeyAlgorithm ResolvePrivateKeyAlgorithm(CertificatePrivateKeyAlgorithm requestedAlgorithm, X509Certificate2 issuer)
+        {
+            if(requestedAlgorithm != CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot)
+            {
+                return requestedAlgorithm;
+            }
+
+            using var ecdsaPublicKey = issuer.GetECDsaPublicKey();
+            if(ecdsaPublicKey is not null)
+            {
+                return ecdsaPublicKey.KeySize <= 256
+                    ? CertificatePrivateKeyAlgorithm.EcdsaP256
+                    : CertificatePrivateKeyAlgorithm.EcdsaP384;
+            }
+
+            using var rsaPublicKey = issuer.GetRSAPublicKey();
+            if(rsaPublicKey is not null)
+            {
+                if(rsaPublicKey.KeySize <= 2048)
+                {
+                    return CertificatePrivateKeyAlgorithm.Rsa2048;
+                }
+
+                return rsaPublicKey.KeySize <= 3072
+                    ? CertificatePrivateKeyAlgorithm.Rsa3072
+                    : CertificatePrivateKeyAlgorithm.Rsa4096;
+            }
+
+            return CertificatePrivateKeyAlgorithm.EcdsaP256;
         }
 
         private static CertificateRequest CreateCertificateRequest(X500DistinguishedName subject, AsymmetricAlgorithm privateKey, HashAlgorithmName hashAlgorithm)

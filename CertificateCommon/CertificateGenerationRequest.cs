@@ -4,6 +4,7 @@ namespace CertificateManager.src
 {
     public enum CertificatePrivateKeyAlgorithm
     {
+        AutoFromIssuerRoot = -1,
         EcdsaP256 = 0,
         EcdsaP384 = 1,
         Rsa2048 = 2,
@@ -29,7 +30,7 @@ namespace CertificateManager.src
         public string[] EnhancedKeyUsages { get; init; } = [];
         public DateTimeOffset ValidFromUtc { get; init; } = DateTimeOffset.UtcNow;
         public DateTimeOffset ValidToUtc { get; init; } = DateTimeOffset.UtcNow.AddYears(10);
-        public CertificatePrivateKeyAlgorithm KeyAlgorithm { get; init; } = CertificatePrivateKeyAlgorithm.EcdsaP256;
+        public CertificatePrivateKeyAlgorithm KeyAlgorithm { get; init; } = CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot;
         public string SignatureHashAlgorithm { get; init; } = "SHA384";
         public bool ExportPrivateKeyPem { get; init; } = true;
 

@@ -38,6 +38,7 @@ namespace Certification.Frontend
 			builder.Services.AddTransient<CertificateOvervieVM>();
 			builder.Services.AddTransient<CreateForCertificateMV>();
 			builder.Services.AddTransient<CertificateUtilityVM>();
+			builder.Services.AddTransient<CARootInfoVM>();
 			builder.Services.AddTransient<HelperMV>();
 			builder.Services.AddTransient<ShaManager>();
 			builder.Services.AddSingleton<HttpClientFactoryCommon>();

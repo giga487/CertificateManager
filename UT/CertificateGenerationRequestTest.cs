@@ -72,5 +72,23 @@ namespace UT
 
             Assert.AreEqual(0, errors.Count);
         }
+
+        [TestMethod]
+        public void Validate_ShouldAcceptAutoFromIssuerRootKeyAlgorithm()
+        {
+            var request = new CertificateGenerationRequest
+            {
+                Solution = "APP",
+                CommonName = "server.local",
+                Organization = "Company",
+                PfxPassword = "secret",
+                EnhancedKeyUsages = ["1.3.6.1.5.5.7.3.1"],
+                KeyAlgorithm = CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot
+            };
+
+            var errors = request.Validate();
+
+            Assert.AreEqual(0, errors.Count);
+        }
     }
 }
