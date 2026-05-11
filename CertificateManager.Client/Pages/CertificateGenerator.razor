@@ -22,6 +22,10 @@
     </FluentStack>
 
     <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
+        <FluentTextArea Rows="1" @bind-Value=ApplicationUri>Application URI</FluentTextArea>
+    </FluentStack>
+
+    <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
         <FluentTextArea Rows="1" @bind-Value=OrganizationalUnit>Organizational Unit</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=Locality>Locality</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=State>State</FluentTextArea>
@@ -144,6 +148,7 @@
             <FluentStack xs="12">
                 <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(ViewModel.CreatedCRTId, Solution))">Download PFX</FluentButton>
                 <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadCRT(ViewModel.CreatedCRTId, Solution))">Download CRT</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(ViewModel.CreatedCRTId, Solution))">Download DER</FluentButton>
             </FluentStack>
 
             <FluentStack>
@@ -177,6 +182,7 @@
     string Country { get; set; } = "IT";
     string CommonName { get; set; } = "server";
     string Password { get; set; } = "secret";
+    string ApplicationUri { get; set; } = "urn:localhost:NXT:server";
     DateTime? ValidFrom { get; set; } = DateTime.UtcNow.Date;
     DateTime? ValidTo { get; set; } = DateTime.UtcNow.Date.AddYears(10);
     CertificatePrivateKeyAlgorithm KeyAlgorithm { get; set; } = CertificatePrivateKeyAlgorithm.Rsa2048;
@@ -722,6 +728,7 @@
             Password = cert.Password ?? "";
             CommonName = cert.CN ?? "";
             Company = cert.Company ?? "";
+            ApplicationUri = cert.ApplicationUri ?? "";
             OrganizationalUnit = cert.OrganizationalUnit ?? "";
             Locality = cert.Locality ?? "Pisa";
             State = cert.State ?? "PI";
@@ -779,6 +786,7 @@
             State = State,
             Country = Country,
             PfxPassword = Password,
+            ApplicationUri = ApplicationUri,
             DnsNames = DNSStrings.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray(),
             IpAddresses = IPStrings.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray(),
             KeyUsages = GetSelectedKeyUsages(),
@@ -794,7 +802,7 @@
 
         foreach(var res in result ?? new ())
         {
-            MakeOutput += $"<br>Created: {res.Created}, Algorithm: {FormatKeyAlgorithm(res.KeyAlgorithm ?? this.KeyAlgorithm.ToString())}, ThumbPrint: {res.ThumbPrint}, Serial: {res.SerialNumber}<br>";
+            MakeOutput += $"<br>Created: {res.Created}, Algorithm: {FormatKeyAlgorithm(res.KeyAlgorithm ?? this.KeyAlgorithm.ToString())}, Application URI: {res.ApplicationUri ?? ApplicationUri}, ThumbPrint: {res.ThumbPrint}, Serial: {res.SerialNumber}<br>";
         }
 
         if(result is null)

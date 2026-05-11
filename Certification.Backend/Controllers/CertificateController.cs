@@ -148,5 +148,23 @@ namespace Certification.Backend.Controllers
 
 			return File(file, "application/octet-stream", "FCNXTCA.crt");
 		}
+
+		[HttpGet("downloadDER")]
+		public IActionResult DownloadFileDER(int id)
+		{
+			var result = CertificationManager.FileManager?.RetrieveCertificates(id);
+			if(result is null || !result.TryGetValue(CertificateTypes.DER, out var filePath))
+			{
+				return NotFound($"No DER certificate with ID: {id}");
+			}
+
+			var file = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+
+			string sha = CertificationManager.FileManager!.ShaManager.HashFile(file);
+			file.Position = 0;
+			Logger?.Warning($"Sha {filePath}: {sha}");
+
+			return File(file, "application/pkix-cert", "Certificate.der");
+		}
 	}
 }

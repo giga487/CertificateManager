@@ -22,6 +22,7 @@ namespace CertificateManager.src
         public string? State { get; init; } = "PI";
         public string? Country { get; init; } = "IT";
         public string? PfxPassword { get; init; }
+        public string? ApplicationUri { get; init; }
         public string[] DnsNames { get; init; } = [];
         public string[] IpAddresses { get; init; } = [];
         public string[] KeyUsages { get; init; } = ["DigitalSignature"];
@@ -64,6 +65,12 @@ namespace CertificateManager.src
                 {
                     errors.Add($"DNS name '{dnsName}' cannot contain spaces.");
                 }
+            }
+
+            if(!string.IsNullOrWhiteSpace(ApplicationUri)
+                && !Uri.TryCreate(ApplicationUri.Trim(), UriKind.Absolute, out _))
+            {
+                errors.Add("ApplicationUri must be an absolute URI.");
             }
 
             foreach (var ipAddress in IpAddresses.Where(x => !string.IsNullOrWhiteSpace(x)))

@@ -28,6 +28,7 @@ namespace UT
                 Organization = "Company",
                 PfxPassword = "secret",
                 Country = "ITA",
+                ApplicationUri = "not an uri",
                 ValidFromUtc = DateTimeOffset.UtcNow,
                 ValidToUtc = DateTimeOffset.UtcNow.AddDays(-1),
                 IpAddresses = ["not-an-ip"],
@@ -40,6 +41,7 @@ namespace UT
             Assert.IsTrue(errors.Any(error => error.Contains("Country")));
             Assert.IsTrue(errors.Any(error => error.Contains("ValidToUtc")));
             Assert.IsTrue(errors.Any(error => error.Contains("not-an-ip")));
+            Assert.IsTrue(errors.Any(error => error.Contains("ApplicationUri")));
             Assert.IsTrue(errors.Any(error => error.Contains("not-an-oid")));
             Assert.IsTrue(errors.Any(error => error.Contains("UnsupportedUsage")));
         }
@@ -57,6 +59,7 @@ namespace UT
                 State = "PI",
                 Country = "IT",
                 PfxPassword = "secret",
+                ApplicationUri = "urn:localhost:Company:server",
                 DnsNames = ["server.local"],
                 IpAddresses = ["127.0.0.1"],
                 KeyUsages = ["DigitalSignature", "KeyEncipherment"],

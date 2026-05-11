@@ -334,13 +334,14 @@ namespace CertificateCommon
             public string? ThumbPrint { get; init; }
             public bool HasPrivateKey { get; init; }
             public string? KeyAlgorithm { get; init; }
+            public string? ApplicationUri { get; init; }
 
             public CertficateFileInfo()
             {
 
             }
 
-            public CertficateFileInfo(string file, X509Certificate2 cert, string? keyAlgorithm = null)
+            public CertficateFileInfo(string file, X509Certificate2 cert, string? keyAlgorithm = null, string? applicationUri = null)
             {
                 var fileInfo = new FileInfo(file);
                 Name = fileInfo.FullName;
@@ -352,6 +353,7 @@ namespace CertificateCommon
                 ThumbPrint = cert.Thumbprint;
                 HasPrivateKey = cert.HasPrivateKey;
                 KeyAlgorithm = keyAlgorithm;
+                ApplicationUri = applicationUri;
 
             }
         }
@@ -401,13 +403,17 @@ namespace CertificateCommon
                 {
                     string pfxFileName = Path.Join(path, pfxName);
                     File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, request.PfxPassword));
-                    fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son, request.KeyAlgorithm.ToString()));
+                    fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son, request.KeyAlgorithm.ToString(), request.ApplicationUri));
 
                     string certFileName = Path.Join(path, certName);
 
                     //File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));//questa per CER
                     File.WriteAllText(certFileName, x509Son.ExportCertificatePem());//questa per CER
-                    fileInfo.Add(new CertficateFileInfo(certFileName, x509Son, request.KeyAlgorithm.ToString()));
+                    fileInfo.Add(new CertficateFileInfo(certFileName, x509Son, request.KeyAlgorithm.ToString(), request.ApplicationUri));
+
+                    string derFileName = Path.Join(path, "Certificate.der");
+                    File.WriteAllBytes(derFileName, x509Son.Export(X509ContentType.Cert));
+                    fileInfo.Add(new CertficateFileInfo(derFileName, x509Son, request.KeyAlgorithm.ToString(), request.ApplicationUri));
 
                     if(request.ExportPrivateKeyPem)
                     {
@@ -423,8 +429,8 @@ namespace CertificateCommon
                     fileInfo.Add(ExtractRoot(certFileNameRoot));
 
                     FileManager?.Add(commonName: request.CommonName!, company: request.Organization!, oid: string.Join(",", request.EnhancedKeyUsages),
-                        pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: request.Solution!,
-                        name: request.Name, password: request.PfxPassword!, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), dns: request.DnsNames,
+                        pfxFile: pfxFileName, crtRoot: certFileNameRoot, derFile: derFileName, solution: request.Solution!,
+                        name: request.Name, password: request.PfxPassword!, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), applicationUri: request.ApplicationUri, dns: request.DnsNames,
                         ipAddresses: request.IpAddresses, organizationalUnit: request.OrganizationalUnit, locality: request.Locality, state: request.State,
                         country: request.Country, validFromUtc: request.ValidFromUtc, validToUtc: request.ValidToUtc, keyUsages: request.KeyUsages, keyAlgorithm: request.KeyAlgorithm.ToString(),
                         signatureHashAlgorithm: request.SignatureHashAlgorithm);
@@ -587,6 +593,13 @@ namespace CertificateCommon
             foreach(var serverN in request.DnsNames.Where(x => !string.IsNullOrWhiteSpace(x)))
             {
                 san.AddDnsName(serverN);
+                hasSubjectAlternativeName = true;
+            }
+
+            if(!string.IsNullOrWhiteSpace(request.ApplicationUri)
+                && Uri.TryCreate(request.ApplicationUri.Trim(), UriKind.Absolute, out var applicationUri))
+            {
+                san.AddUri(applicationUri);
                 hasSubjectAlternativeName = true;
             }
 

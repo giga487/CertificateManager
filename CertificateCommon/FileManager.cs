@@ -15,6 +15,7 @@ namespace CertificateManager.src
         PFX = 2,
         CARootNoKey = 3,
         CRT = 4,
+        DER = 5,
 
     }
 
@@ -140,11 +141,13 @@ namespace CertificateManager.src
         public string? Name { get; init; } // Human-friendly name for certificate organization
         public string? PFXCertificate { get; init; }
         public string? CRTCertificate { get; init; }
+        public string? DERCertificate { get; init; }
         public DateTime Creation { get; init; } = DateTime.Now;
         public DateTimeOffset? ValidFromUtc { get; init; }
         public DateTimeOffset? ValidToUtc { get; init; }
         public string? RootThumbPrint { get; set; } = string.Empty;
         public string? Address { get; init; }
+        public string? ApplicationUri { get; init; }
         public string[]? DNS { get; init; }
         public string[]? IpAddresses { get; init; }
         public string? Oid { get; init; }
@@ -294,6 +297,11 @@ namespace CertificateManager.src
                     files[CertificateTypes.CARootNoKey] = dataFound.CRTCertificate;
                 }
 
+                if(!string.IsNullOrEmpty(dataFound.DERCertificate))
+                {
+                    files[CertificateTypes.DER] = dataFound.DERCertificate;
+                }
+
                 return files;
             }
             finally
@@ -370,6 +378,7 @@ namespace CertificateManager.src
             {
                 CRTCertificate = source.CRTCertificate,
                 PFXCertificate = source.PFXCertificate,
+                DERCertificate = source.DERCertificate,
                 CN = source.CN,
                 Company = source.Company,
                 OrganizationalUnit = source.OrganizationalUnit,
@@ -382,6 +391,7 @@ namespace CertificateManager.src
                 Id = id,
                 RootThumbPrint = source.RootThumbPrint,
                 Address = source.Address,
+                ApplicationUri = source.ApplicationUri,
                 DNS = source.DNS,
                 IpAddresses = source.IpAddresses,
                 Oid = source.Oid,
@@ -400,11 +410,13 @@ namespace CertificateManager.src
             string company,
             string commonName,
             string crtRoot,
+            string? derFile,
             string solution,
             string? name,
             string password,
             string rootThumbprint,
             string? address,
+            string? applicationUri,
             string[] dns,
             string[] ipAddresses,
             string? organizationalUnit,
@@ -424,6 +436,7 @@ namespace CertificateManager.src
                 {
                     CRTCertificate = crtRoot,
                     PFXCertificate = pfxFile,
+                    DERCertificate = derFile,
                     CN = commonName,
                     Company = company,
                     OrganizationalUnit = organizationalUnit,
@@ -436,6 +449,7 @@ namespace CertificateManager.src
                     Id = (_lastJSonMemory?.MaxId ?? 0) + 1,
                     RootThumbPrint = rootThumbprint,
                     Address = address,
+                    ApplicationUri = applicationUri,
                     DNS = dns,
                     IpAddresses = ipAddresses,
                     Oid = oid,

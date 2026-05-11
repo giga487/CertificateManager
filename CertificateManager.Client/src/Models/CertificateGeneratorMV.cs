@@ -146,5 +146,21 @@ namespace CertificateManager.Client.src.Models
 
             }
         }
+
+        public async void DownloadDER(int? id)
+        {
+            _logger?.Information($"DER: {id}");
+            try
+            {
+                if(Certificates?.Get(id ?? 0, out var found) ?? false)
+                {
+                    await _factory?.Download($"api/Certificate/downloadDER?id={id}", runtime: _jsRuntime, prefix: found.Solution);
+                }
+            }
+            catch(OperationCanceledException ex)
+            {
+
+            }
+        }
     }
 }

@@ -25,6 +25,7 @@ else if (ViewModel?.Certificates?.CertificatesDB != null && ViewModel.Certificat
         <PropertyColumn Property="@(p => p.Solution)" Sortable="true" Title="Solution" />
         <PropertyColumn Property="@(p => p.Name)" Sortable="true" Title="Name" />
         <PropertyColumn Property="@(p => p.KeyAlgorithm)" Sortable="true" Title="Algorithm" />
+        <PropertyColumn Property="@(p => p.ApplicationUri)" Sortable="true" Title="Application URI" />
         <PropertyColumn Property="@(p => p.Password)" Width="10%" />
         <TemplateColumn Title="DNS">
             @(context.DNS is null ? string.Empty : string.Join(", ", context.DNS))
@@ -35,6 +36,9 @@ else if (ViewModel?.Certificates?.CertificatesDB != null && ViewModel.Certificat
         </TemplateColumn>
         <TemplateColumn Title="CA Root" Width="8%">
             <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
+        </TemplateColumn>
+        <TemplateColumn Title="DER" Width="8%">
+            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(context.Id))">Download</FluentButton>
         </TemplateColumn>
         <TemplateColumn Title="Regenerate" Width="8%">
             <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(context.Id))">Modify</FluentButton>
