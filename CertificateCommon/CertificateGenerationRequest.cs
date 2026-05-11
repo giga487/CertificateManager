@@ -4,7 +4,11 @@ namespace CertificateManager.src
 {
     public enum CertificatePrivateKeyAlgorithm
     {
-        EcdsaP256 = 0
+        EcdsaP256 = 0,
+        EcdsaP384 = 1,
+        Rsa2048 = 2,
+        Rsa3072 = 3,
+        Rsa4096 = 4
     }
 
     public class CertificateGenerationRequest

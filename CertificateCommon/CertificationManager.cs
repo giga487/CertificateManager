@@ -333,13 +333,14 @@ namespace CertificateCommon
             public string? SerialNumber { get; init; }
             public string? ThumbPrint { get; init; }
             public bool HasPrivateKey { get; init; }
+            public string? KeyAlgorithm { get; init; }
 
             public CertficateFileInfo()
             {
 
             }
 
-            public CertficateFileInfo(string file, X509Certificate2 cert)
+            public CertficateFileInfo(string file, X509Certificate2 cert, string? keyAlgorithm = null)
             {
                 var fileInfo = new FileInfo(file);
                 Name = fileInfo.FullName;
@@ -350,6 +351,7 @@ namespace CertificateCommon
                 SerialNumber = cert.SerialNumber;
                 ThumbPrint = cert.Thumbprint;
                 HasPrivateKey = cert.HasPrivateKey;
+                KeyAlgorithm = keyAlgorithm;
 
             }
         }
@@ -363,7 +365,7 @@ namespace CertificateCommon
             }
 
             List<CertficateFileInfo> fileInfo = new List<CertficateFileInfo>();
-            using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256); // Uso di ECDsa come da te suggerito
+            using var serverKey = CreatePrivateKey(request.KeyAlgorithm);
 
             if(CARoot is null)
             {
@@ -392,38 +394,30 @@ namespace CertificateCommon
                 Directory.CreateDirectory(path);
             }
 
-            var serverPfx = x509Son!.CopyWithPrivateKey(serverKey);
+            var serverPfx = CopyWithPrivateKey(x509Son!, serverKey);
             if(!string.IsNullOrEmpty(request.PfxPassword) && serverPfx is not null)
             {
                 try
                 {
                     string pfxFileName = Path.Join(path, pfxName);
                     File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, request.PfxPassword));
-                    fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son));
+                    fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son, request.KeyAlgorithm.ToString()));
 
                     string certFileName = Path.Join(path, certName);
 
                     //File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));//questa per CER
                     File.WriteAllText(certFileName, x509Son.ExportCertificatePem());//questa per CER
-                    fileInfo.Add(new CertficateFileInfo(certFileName, x509Son));
+                    fileInfo.Add(new CertficateFileInfo(certFileName, x509Son, request.KeyAlgorithm.ToString()));
 
-                    using ECDsa? ecKey = serverPfx.GetECDsaPrivateKey();
-
-                    if(request.ExportPrivateKeyPem && ecKey != null)
+                    if(request.ExportPrivateKeyPem)
                     {
-                        // Esporta in formato PEM standard (quello che inizia con -----BEGIN PRIVATE KEY-----)
-                        string privateKeyPem = ecKey.ExportPkcs8PrivateKeyPem();
+                        string privateKeyPem = ExportPrivateKeyPem(serverKey);
 
                         string privateKeyFName = Path.Join(path, "private.key");
 
                         File.WriteAllText(privateKeyFName, privateKeyPem);
                         Logger?.Information("Private key generated: 'private.key'");
                     }
-                    else if(request.ExportPrivateKeyPem)
-                    {
-                        Logger?.Error("Impossibile to fix the private key files");
-                    }
-
 
                     string certFileNameRoot = Path.Join(path, "Root.crt");
                     fileInfo.Add(ExtractRoot(certFileNameRoot));
@@ -534,7 +528,7 @@ namespace CertificateCommon
             return CreateCertificate(request, privateKey, issuer, isCertificateAuthority, friendlyName);
         }
 
-        private X509Certificate2? CreateCertificate(CertificateGenerationRequest request, ECDsa privateKey, X509Certificate2 issuer, bool isCertificateAuthority, string? friendlyName = "")
+        private X509Certificate2? CreateCertificate(CertificateGenerationRequest request, AsymmetricAlgorithm privateKey, X509Certificate2 issuer, bool isCertificateAuthority, string? friendlyName = "")
         {
             // Parse OID string - can contain multiple OIDs separated by comma, semicolon, or space
             var oidCollection = new OidCollection();
@@ -567,10 +561,7 @@ namespace CertificateCommon
 
             var subject = CreateSubject(request);
 
-            var serverRequest = new CertificateRequest(
-                subject,
-                privateKey,
-                ResolveHashAlgorithm(request.SignatureHashAlgorithm));
+            var serverRequest = CreateCertificateRequest(subject, privateKey, ResolveHashAlgorithm(request.SignatureHashAlgorithm));
 
             // Aggiungi le estensioni necessarie per un certificato server
             serverRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(isCertificateAuthority, isCertificateAuthority, 0, true));
@@ -633,6 +624,49 @@ namespace CertificateCommon
             AddSubjectPart(parts, "C", request.Country);
 
             return new X500DistinguishedName(string.Join(", ", parts));
+        }
+
+        private static AsymmetricAlgorithm CreatePrivateKey(CertificatePrivateKeyAlgorithm algorithm)
+        {
+            return algorithm switch
+            {
+                CertificatePrivateKeyAlgorithm.EcdsaP256 => ECDsa.Create(ECCurve.NamedCurves.nistP256),
+                CertificatePrivateKeyAlgorithm.EcdsaP384 => ECDsa.Create(ECCurve.NamedCurves.nistP384),
+                CertificatePrivateKeyAlgorithm.Rsa2048 => RSA.Create(2048),
+                CertificatePrivateKeyAlgorithm.Rsa3072 => RSA.Create(3072),
+                CertificatePrivateKeyAlgorithm.Rsa4096 => RSA.Create(4096),
+                _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm, "Unsupported private key algorithm.")
+            };
+        }
+
+        private static CertificateRequest CreateCertificateRequest(X500DistinguishedName subject, AsymmetricAlgorithm privateKey, HashAlgorithmName hashAlgorithm)
+        {
+            return privateKey switch
+            {
+                ECDsa ecdsa => new CertificateRequest(subject, ecdsa, hashAlgorithm),
+                RSA rsa => new CertificateRequest(subject, rsa, hashAlgorithm, RSASignaturePadding.Pkcs1),
+                _ => throw new ArgumentException("Unsupported private key algorithm.", nameof(privateKey))
+            };
+        }
+
+        private static X509Certificate2 CopyWithPrivateKey(X509Certificate2 certificate, AsymmetricAlgorithm privateKey)
+        {
+            return privateKey switch
+            {
+                ECDsa ecdsa => certificate.CopyWithPrivateKey(ecdsa),
+                RSA rsa => certificate.CopyWithPrivateKey(rsa),
+                _ => throw new ArgumentException("Unsupported private key algorithm.", nameof(privateKey))
+            };
+        }
+
+        private static string ExportPrivateKeyPem(AsymmetricAlgorithm privateKey)
+        {
+            return privateKey switch
+            {
+                ECDsa ecdsa => ecdsa.ExportPkcs8PrivateKeyPem(),
+                RSA rsa => rsa.ExportPkcs8PrivateKeyPem(),
+                _ => throw new ArgumentException("Unsupported private key algorithm.", nameof(privateKey))
+            };
         }
 
         private static void AddSubjectPart(List<string> parts, string key, string? value)

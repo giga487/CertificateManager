@@ -39,6 +39,16 @@
         </div>
     </FluentStack>
 
+    <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
+        <FluentLabel Weight="FontWeight.Bold">Private Key Algorithm</FluentLabel>
+        <select class="oid-filter-input" @bind="KeyAlgorithm">
+            <option value="@CertificatePrivateKeyAlgorithm.Rsa2048">RSA 2048</option>
+            <option value="@CertificatePrivateKeyAlgorithm.Rsa3072">RSA 3072</option>
+            <option value="@CertificatePrivateKeyAlgorithm.Rsa4096">RSA 4096</option>
+            <option value="@CertificatePrivateKeyAlgorithm.EcdsaP256">ECDSA P-256</option>
+            <option value="@CertificatePrivateKeyAlgorithm.EcdsaP384">ECDSA P-384</option>
+        </select>
+    </FluentStack>
 
     <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
         <FluentLabel Weight="FontWeight.Bold">Key Usage</FluentLabel>
@@ -169,6 +179,7 @@
     string Password { get; set; } = "secret";
     DateTime? ValidFrom { get; set; } = DateTime.UtcNow.Date;
     DateTime? ValidTo { get; set; } = DateTime.UtcNow.Date.AddYears(10);
+    CertificatePrivateKeyAlgorithm KeyAlgorithm { get; set; } = CertificatePrivateKeyAlgorithm.Rsa2048;
 
     string MakeOutput { get; set; } = "";
 
@@ -628,6 +639,26 @@
         return selectedKeyUsages.Count > 0 ? selectedKeyUsages.ToArray() : ["DigitalSignature"];
     }
 
+    private static CertificatePrivateKeyAlgorithm ParseKeyAlgorithm(string? keyAlgorithm)
+    {
+        return Enum.TryParse<CertificatePrivateKeyAlgorithm>(keyAlgorithm, ignoreCase: true, out var parsed)
+            ? parsed
+            : CertificatePrivateKeyAlgorithm.Rsa2048;
+    }
+
+    private static string FormatKeyAlgorithm(string? keyAlgorithm)
+    {
+        return keyAlgorithm switch
+        {
+            nameof(CertificatePrivateKeyAlgorithm.Rsa2048) => "RSA 2048",
+            nameof(CertificatePrivateKeyAlgorithm.Rsa3072) => "RSA 3072",
+            nameof(CertificatePrivateKeyAlgorithm.Rsa4096) => "RSA 4096",
+            nameof(CertificatePrivateKeyAlgorithm.EcdsaP256) => "ECDSA P-256",
+            nameof(CertificatePrivateKeyAlgorithm.EcdsaP384) => "ECDSA P-384",
+            _ => keyAlgorithm ?? string.Empty
+        };
+    }
+
     private void SetKeyUsageCheckboxes(string[]? keyUsages)
     {
         KeyUsageDigitalSignature = false;
@@ -697,6 +728,7 @@
             Country = cert.Country ?? "IT";
             ValidFrom = (cert.ValidFromUtc ?? DateTimeOffset.UtcNow).UtcDateTime.Date;
             ValidTo = (cert.ValidToUtc ?? DateTimeOffset.UtcNow.AddYears(10)).UtcDateTime.Date;
+            KeyAlgorithm = ParseKeyAlgorithm(cert.KeyAlgorithm);
 
             // Set OID checkboxes from certificate
             SetOidCheckboxes(cert.Oid);
@@ -753,7 +785,7 @@
             EnhancedKeyUsages = oid.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             ValidFromUtc = validFromUtc,
             ValidToUtc = validToUtc,
-            KeyAlgorithm = CertificatePrivateKeyAlgorithm.EcdsaP256,
+            KeyAlgorithm = this.KeyAlgorithm,
             SignatureHashAlgorithm = "SHA384",
             ExportPrivateKeyPem = true
         };
@@ -762,7 +794,7 @@
 
         foreach(var res in result ?? new ())
         {
-            MakeOutput += $"<br>Created: {res.Created}, ThumbPrint: {res.ThumbPrint}, Serial: {res.SerialNumber}<br>";
+            MakeOutput += $"<br>Created: {res.Created}, Algorithm: {FormatKeyAlgorithm(res.KeyAlgorithm ?? this.KeyAlgorithm.ToString())}, ThumbPrint: {res.ThumbPrint}, Serial: {res.SerialNumber}<br>";
         }
 
         if(result is null)

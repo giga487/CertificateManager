@@ -24,6 +24,7 @@ else if (ViewModel?.Certificates?.CertificatesDB != null && ViewModel.Certificat
         <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="15%" />
         <PropertyColumn Property="@(p => p.Solution)" Sortable="true" Title="Solution" />
         <PropertyColumn Property="@(p => p.Name)" Sortable="true" Title="Name" />
+        <PropertyColumn Property="@(p => p.KeyAlgorithm)" Sortable="true" Title="Algorithm" />
         <PropertyColumn Property="@(p => p.Password)" Width="10%" />
         <TemplateColumn Title="DNS">
             @(context.DNS is null ? string.Empty : string.Join(", ", context.DNS))
