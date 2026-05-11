@@ -1,6 +1,7 @@
 using CertificateCommon;
 using CertificateManager.src;
-using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 namespace UT
 {
@@ -8,11 +9,24 @@ namespace UT
     public class FileManagerTest
     {
         private string _tempFile = "";
+        private string _tempPfxFile = "";
+        private string _tempCrtFile = "";
+        private const string TestCertificatePassword = "pass";
 
         [TestInitialize]
         public void Setup()
         {
             _tempFile = Path.Combine(Path.GetTempPath(), $"cert_db_{Guid.NewGuid()}.json");
+            _tempPfxFile = Path.Combine(Path.GetTempPath(), $"cert_{Guid.NewGuid()}.pfx");
+            _tempCrtFile = Path.Combine(Path.GetTempPath(), $"cert_{Guid.NewGuid()}.crt");
+
+            using var rsa = RSA.Create(2048);
+            var request = new CertificateRequest("CN=FileManagerTest", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            var now = DateTimeOffset.UtcNow;
+            using var certificate = request.CreateSelfSigned(now, now.AddDays(1));
+
+            File.WriteAllBytes(_tempPfxFile, certificate.Export(X509ContentType.Pfx, TestCertificatePassword));
+            File.WriteAllText(_tempCrtFile, certificate.ExportCertificatePem());
         }
 
         [TestCleanup]
@@ -26,6 +40,9 @@ namespace UT
                 }
                 catch { }
             }
+
+            DeleteIfExists(_tempPfxFile);
+            DeleteIfExists(_tempCrtFile);
         }
 
         [TestMethod]
@@ -49,14 +66,14 @@ namespace UT
                     {
                         string id = $"{threadId}_{j}";
                         fileManager.Add(
-                            pfxFile: $"pfx_{id}", 
+                            pfxFile: _tempPfxFile, 
                             oid: "1.2.3", 
                             company: "TestComp", 
                             commonName: $"CN_{id}", 
-                            crtRoot: "root", 
+                            crtRoot: _tempCrtFile, 
                             solution: $"Sol_{id}", 
                             name: $"Name_{id}",
-                            password: "pass", 
+                            password: TestCertificatePassword, 
                             rootThumbprint: "thumb", 
                             address: "127.0.0.1", 
                             dns: new[] { "dns1" }
@@ -74,6 +91,22 @@ namespace UT
             int actualCount = fileManager2.JSONMemory?.CertificatesDB.Count ?? 0;
             
             Assert.AreEqual(expectedCount, actualCount, "Total number of certificates mismatch after concurrent adds.");
+        }
+
+        private static void DeleteIfExists(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                File.Delete(path);
+            }
+            catch
+            {
+            }
         }
     }
 }
