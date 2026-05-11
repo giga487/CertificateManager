@@ -76,7 +76,17 @@ namespace UT
                             password: TestCertificatePassword, 
                             rootThumbprint: "thumb", 
                             address: "127.0.0.1", 
-                            dns: new[] { "dns1" }
+                            dns: new[] { "dns1" },
+                            ipAddresses: new[] { "127.0.0.1" },
+                            organizationalUnit: "Unit",
+                            locality: "Pisa",
+                            state: "PI",
+                            country: "IT",
+                            validFromUtc: DateTimeOffset.UtcNow,
+                            validToUtc: DateTimeOffset.UtcNow.AddDays(1),
+                            keyUsages: new[] { "DigitalSignature" },
+                            keyAlgorithm: CertificatePrivateKeyAlgorithm.EcdsaP256.ToString(),
+                            signatureHashAlgorithm: "SHA384"
                         );
                     }
                 }));

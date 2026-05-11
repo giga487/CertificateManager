@@ -69,7 +69,6 @@ namespace Common
                  .WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information, outputTemplate: outputTempalte)
                  .Enrich.WithEnvironmentName()
                  .WriteTo.Sink(MemorySink, LogEventLevel.Information)
-                 .WriteTo.BrowserConsole(LogEventLevel.Warning, outputTempalte)
                  .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore"));
 
             configuration.MinimumLevel.Override("Microsoft.AspNetCore.Hosting.Diagnostics", LogEventLevel.Error);

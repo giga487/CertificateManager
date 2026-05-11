@@ -62,11 +62,16 @@ namespace Certification.Backend
 
 			if(app.Environment.IsDevelopment())
 			{
+				app.UseDeveloperExceptionPage();
 				app.MapOpenApi();
+				app.UseSwaggerUI(options =>
+				{
+					options.SwaggerEndpoint("/openapi/v1.json", "Certification Backend API v1");
+				});
 			}
 
-			app.UseHttpsRedirection();
 			app.UseCors("Frontend");
+			app.UseHttpsRedirection();
 			app.UseAuthorization();
 
 			app.MapControllers();

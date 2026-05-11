@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "Backend Frontend",
+    "Projects": [
+      {
+        "Path": "Certification.Backend\\Certification.Backend.csproj",
+        "Action": "Start",
+        "DebugTarget": "https"
+      },
+      {
+        "Path": "Certification.Frontend\\Certification.Frontend.csproj",
+        "Action": "Start",
+        "DebugTarget": "https"
+      }
+    ]
+  }
+]

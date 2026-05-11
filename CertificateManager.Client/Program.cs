@@ -38,6 +38,8 @@ namespace CertificateManager.Client
         static async Task Main(string[] args)
         {
             var builder = WebAssemblyHostBuilder.CreateDefault(args);
+            builder.RootComponents.Add<Routes>("#app");
+            builder.RootComponents.Add<Microsoft.AspNetCore.Components.Web.HeadOutlet>("head::after");
             builder.Services.AddFluentUIComponents();
 
             LoggerBuilder<ClientLogMessage> loggbuilder = new LoggerBuilder<ClientLogMessage>("LOG/Cert.Log");

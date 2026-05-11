@@ -30,10 +30,6 @@ body {
     width: 100%;
 }
 
-.manage {
-    width: 100dvw;
-}
-
 footer {
     background: var(--neutral-layer-4);
     color: var(--neutral-foreground-rest);
@@ -188,105 +184,4 @@ code {
         left: 20px;
         right: unset;
     }
-
-    .pre-formatted-text {
-        background-color: #fff;
-        padding: 1.5rem;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-    }
-}
-
-.wrap-container {
-
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-
-    border: 1px solid var(--neutral-stroke-rest);
-    padding: 10px;
-    border-radius: 4px;
-}
-
-.flex-item {
-    flex-basis: 200px;
-
-    flex-grow: 1;
-}
-
-.certificate-date-field {
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 220px;
-    gap: 4px;
-}
-
-.oid-filter-input {
-    min-height: 32px;
-    padding: 4px 8px;
-    border: 1px solid var(--neutral-stroke-rest);
-    border-radius: 4px;
-    color: var(--neutral-foreground-rest);
-    background: var(--neutral-fill-input-rest);
-    font: inherit;
-}
-
-.oid-filter-input:focus {
-    border-color: var(--accent-fill-rest);
-    outline: 1px solid var(--accent-fill-rest);
-}
-
-.oid-option-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 6px;
-    max-height: 420px;
-    overflow: auto;
-    padding: 8px;
-    border: 1px solid var(--neutral-stroke-rest);
-    border-radius: 4px;
-}
-
-.oid-option-row {
-    display: grid;
-    grid-template-columns: 20px minmax(0, 1fr);
-    gap: 8px;
-    align-items: start;
-    padding: 8px;
-    border: 1px solid var(--neutral-stroke-rest);
-    border-radius: 4px;
-    background: var(--neutral-layer-1);
-}
-
-.oid-option-row input {
-    margin-top: 3px;
-}
-
-.oid-option-text,
-.oid-option-main {
-    display: flex;
-    min-width: 0;
-}
-
-.oid-option-text {
-    flex-direction: column;
-    gap: 3px;
-}
-
-.oid-option-main {
-    align-items: baseline;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.oid-option-main code {
-    font-size: 0.85rem;
-}
-
-.oid-option-description,
-.oid-option-category {
-    color: var(--neutral-foreground-hint);
-    font-size: 0.85rem;
 }

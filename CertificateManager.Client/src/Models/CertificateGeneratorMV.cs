@@ -55,6 +55,7 @@ namespace CertificateManager.Client.src.Models
             }
         }
         public CertificateDB? Certificates { get; private set; } = null;
+        public bool IsLoading { get; private set; } = true;
 
         Task? _pollingTask;
         public void Polling()
@@ -67,12 +68,9 @@ namespace CertificateManager.Client.src.Models
                     {
                         var result = await _factory?.GetAsync<CertificateDB>("api/Certificate/info");
 
-                        if(result is not null)
-                        {
-                            Certificates = result;
-
-                            OnStateChange("Info received");
-                        }
+                        Certificates = result;
+                        IsLoading = false;
+                        OnStateChange("Info received");
 
                         await Task.Delay(6000);
                     }
@@ -83,6 +81,8 @@ namespace CertificateManager.Client.src.Models
                 }
                 catch(Exception ex)
                 {
+                    IsLoading = false;
+                    OnStateChange("Info failed");
                     _logger?.Information($"{ex.Message}");
                 }
             });

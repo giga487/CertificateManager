@@ -1,4 +1,6 @@
 ﻿@page "/certificateGenerator/ID={ID:int}"
+@using System.Text.RegularExpressions
+@using CertificateManager.src
 @using CertificateManager.Client.src.Models
 @inject IJSRuntime JSRuntime
 
@@ -14,187 +16,73 @@
     <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
         <FluentTextArea Rows="1" @bind-Value=Solution>Solution</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=Name>Name (optional)</FluentTextArea>
-        <FluentTextArea Rows="1" @bind-Value=CertificateAddress>Address</FluentTextArea>
-        <FluentTextArea Rows="1" @bind-Value=Company>Company</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=CommonName>Common Name</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Company>Organization</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=Password>Password</FluentTextArea>
+    </FluentStack>
+
+    <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
+        <FluentTextArea Rows="1" @bind-Value=OrganizationalUnit>Organizational Unit</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Locality>Locality</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=State>State</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Country>Country</FluentTextArea>
+    </FluentStack>
+
+    <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
+        <div class="certificate-date-field">
+            <FluentDatePicker Label="Valid From UTC"
+                              @bind-Value=ValidFrom />
+        </div>
+        <div class="certificate-date-field">
+            <FluentDatePicker Label="Valid To UTC"
+                              @bind-Value=ValidTo />
+        </div>
     </FluentStack>
 
 
     <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
+        <FluentLabel Weight="FontWeight.Bold">Key Usage</FluentLabel>
+        <FluentStack Orientation="Orientation.Horizontal" Style="flex-wrap: wrap;">
+            <FluentCheckbox @bind-Value=KeyUsageDigitalSignature>Digital Signature</FluentCheckbox>
+            <FluentCheckbox @bind-Value=KeyUsageNonRepudiation>Non Repudiation</FluentCheckbox>
+            <FluentCheckbox @bind-Value=KeyUsageKeyEncipherment>Key Encipherment</FluentCheckbox>
+            <FluentCheckbox @bind-Value=KeyUsageDataEncipherment>Data Encipherment</FluentCheckbox>
+            <FluentCheckbox @bind-Value=KeyUsageKeyAgreement>Key Agreement</FluentCheckbox>
+        </FluentStack>
+    </FluentStack>
+
+    <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
         <FluentLabel Weight="FontWeight.Bold">Certificate Usage (OID Selection) / Utilizzo Certificato (Selezione OID):</FluentLabel>
-        <FluentLabel Style="margin-bottom: 1rem;">Select one or more Enhanced Key Usage (EKU) options for the certificate / Seleziona uno o più utilizzi (EKU) per il certificato</FluentLabel>
-        
-        <FluentAccordion>
-            <FluentAccordionItem Heading="Standard SSL/TLS" Expanded="true">
-                <FluentCheckbox @bind-Value=ServerAuthentication>
-                    <strong>Server Authentication</strong> (HTTPS Server - 1.3.6.1.5.5.7.3.1)<br/>
-                    <small>TLS/SSL server authentication / Autenticazione server TLS/SSL</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=ClientAuthentication>
-                    <strong>Client Authentication</strong> (mTLS Client - 1.3.6.1.5.5.7.3.2)<br/>
-                    <small>TLS/SSL client authentication / Autenticazione client TLS/SSL</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=CodeSigning>
-                    <strong>Code Signing</strong> (1.3.6.1.5.5.7.3.3)<br/>
-                    <small>Signing of downloadable executable code / Firma del codice eseguibile</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=EmailProtection>
-                    <strong>Email Protection</strong> (S/MIME - 1.3.6.1.5.5.7.3.4)<br/>
-                    <small>Email protection (S/MIME) / Protezione email (S/MIME)</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=TimeStamping>
-                    <strong>Time Stamping</strong> (1.3.6.1.5.5.7.3.8)<br/>
-                    <small>Trusted timestamping / Marcatura temporale attendibile</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=OcspSigning>
-                    <strong>OCSP Signing</strong> (1.3.6.1.5.5.7.3.9)<br/>
-                    <small>Signing OCSP responses / Firma risposte OCSP</small>
-                </FluentCheckbox>
-            </FluentAccordionItem>
+        <input class="oid-filter-input"
+               type="search"
+               placeholder="Filter EKU by name, OID, category. Use * as wildcard."
+               value="@OidFilter"
+               @oninput="OnOidFilterChanged" />
 
-            <FluentAccordionItem Heading="IPSec">
-                <FluentCheckbox @bind-Value=IpsecEndSystem>
-                    <strong>IPSec End System</strong> (1.3.6.1.5.5.7.3.5)<br/>
-                    <small>IPsec end system authentication / Autenticazione sistema finale IPsec</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=IpsecTunnel>
-                    <strong>IPSec Tunnel</strong> (1.3.6.1.5.5.7.3.6)<br/>
-                    <small>IPsec tunnel authentication / Autenticazione tunnel IPsec</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=IpsecUser>
-                    <strong>IPSec User</strong> (1.3.6.1.5.5.7.3.7)<br/>
-                    <small>IPsec user authentication / Autenticazione utente IPsec</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=IpsecIke>
-                    <strong>IPSEC IKE</strong> (1.3.6.1.5.5.7.3.17)<br/>
-                    <small>IPsec Internet Key Exchange / Scambio chiavi Internet IPsec</small>
-                </FluentCheckbox>
-            </FluentAccordionItem>
-
-            <FluentAccordionItem Heading="Microsoft Specific">
-                <FluentCheckbox @bind-Value=MsTrustListSigning>
-                    <strong>Microsoft Trust List Signing</strong> (1.3.6.1.4.1.311.10.3.1)<br/>
-                    <small>Signing certificate trust lists / Firma liste certificati attendibili</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsTimeStamping>
-                    <strong>Microsoft Time Stamping</strong> (1.3.6.1.4.1.311.10.3.2)<br/>
-                    <small>Microsoft timestamping service / Servizio marcatura temporale Microsoft</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsServerGatedCrypto>
-                    <strong>Microsoft Server Gated Crypto</strong> (1.3.6.1.4.1.311.10.3.3)<br/>
-                    <small>Legacy strong cryptography / Crittografia forte legacy</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsEncryptedFileSystem>
-                    <strong>Microsoft Encrypted File System</strong> (1.3.6.1.4.1.311.10.3.4)<br/>
-                    <small>Windows EFS encryption / Crittografia EFS Windows</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsFileRecovery>
-                    <strong>Microsoft File Recovery</strong> (1.3.6.1.4.1.311.10.3.4.1)<br/>
-                    <small>File recovery agent / Agente recupero file</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsWindowsSystemComponentVerification>
-                    <strong>Microsoft Windows System Component Verification</strong> (1.3.6.1.4.1.311.10.3.6)<br/>
-                    <small>Windows system component verification / Verifica componenti sistema Windows</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsOemWindowsSystemComponentVerification>
-                    <strong>Microsoft OEM Windows System Component Verification</strong> (1.3.6.1.4.1.311.10.3.7)<br/>
-                    <small>OEM Windows component verification / Verifica componenti OEM Windows</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsEmbeddedWindowsSystemComponentVerification>
-                    <strong>Microsoft Embedded Windows System Component Verification</strong> (1.3.6.1.4.1.311.10.3.8)<br/>
-                    <small>Embedded Windows component verification / Verifica componenti Embedded Windows</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsRootListSigner>
-                    <strong>Microsoft Root List Signer</strong> (1.3.6.1.4.1.311.10.3.9)<br/>
-                    <small>Signing root certificate lists / Firma liste certificati radice</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsQualifiedSubordination>
-                    <strong>Microsoft Qualified Subordination</strong> (1.3.6.1.4.1.311.10.3.10)<br/>
-                    <small>Qualified subordinate CA / CA subordinata qualificata</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsKeyRecovery>
-                    <strong>Microsoft Key Recovery</strong> (1.3.6.1.4.1.311.10.3.11)<br/>
-                    <small>Key recovery agent / Agente recupero chiavi</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsDocumentSigning>
-                    <strong>Microsoft Document Signing</strong> (1.3.6.1.4.1.311.10.3.12)<br/>
-                    <small>Document signing / Firma documenti</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsLifetimeSigning>
-                    <strong>Microsoft Lifetime Signing</strong> (1.3.6.1.4.1.311.10.3.13)<br/>
-                    <small>Lifetime signing / Firma a vita</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsSmartCardLogon>
-                    <strong>Microsoft Smart Card Logon</strong> (1.3.6.1.4.1.311.20.2.2)<br/>
-                    <small>Smart card logon / Accesso con smart card</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=MsKernelModeCodeSigning>
-                    <strong>Microsoft Kernel Mode Code Signing</strong> (1.3.6.1.4.1.311.61.1.1)<br/>
-                    <small>Kernel-mode driver signing / Firma driver kernel-mode</small>
-                </FluentCheckbox>
-            </FluentAccordionItem>
-
-            <FluentAccordionItem Heading="Network & Authentication">
-                <FluentCheckbox @bind-Value=Dvcs>
-                    <strong>DVCS</strong> (Data Validation and Certification Server - 1.3.6.1.5.5.7.3.10)<br/>
-                    <small>Data validation and certification server / Server validazione e certificazione dati</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=SbgpCertificate>
-                    <strong>SBGP Certificate</strong> (1.3.6.1.5.5.7.3.11)<br/>
-                    <small>Secure BGP (S-BGP) / BGP sicuro</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=EapOverPpp>
-                    <strong>EAP Over PPP</strong> (1.3.6.1.5.5.7.3.13)<br/>
-                    <small>EAP over PPP authentication / Autenticazione EAP su PPP</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=EapOverLan>
-                    <strong>EAP Over LAN</strong> (1.3.6.1.5.5.7.3.14)<br/>
-                    <small>EAP over LAN (EAPOL) authentication / Autenticazione EAP su LAN</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=ScvpServer>
-                    <strong>SCVP Server</strong> (1.3.6.1.5.5.7.3.15)<br/>
-                    <small>SCVP server certificate validation / Validazione certificati server SCVP</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=ScvpClient>
-                    <strong>SCVP Client</strong> (1.3.6.1.5.5.7.3.16)<br/>
-                    <small>SCVP client certificate validation / Validazione certificati client SCVP</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=CapwapAc>
-                    <strong>CAPWAP AC</strong> (1.3.6.1.5.5.7.3.18)<br/>
-                    <small>CAPWAP Access Controller / Controller accesso CAPWAP</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=CapwapWtp>
-                    <strong>CAPWAP WTP</strong> (1.3.6.1.5.5.7.3.19)<br/>
-                    <small>CAPWAP Wireless Termination Point / Punto terminazione wireless CAPWAP</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=SipDomain>
-                    <strong>SIP Domain</strong> (1.3.6.1.5.5.7.3.20)<br/>
-                    <small>SIP domain certificate / Certificato dominio SIP</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=SshClient>
-                    <strong>SSH Client</strong> (1.3.6.1.5.5.7.3.21)<br/>
-                    <small>SSH client certificate authentication / Autenticazione certificato client SSH</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=SshServer>
-                    <strong>SSH Server</strong> (1.3.6.1.5.5.7.3.22)<br/>
-                    <small>SSH server certificate authentication / Autenticazione certificato server SSH</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=KerberosPkinitClientAuth>
-                    <strong>Kerberos PKINIT Client Auth</strong> (1.3.6.1.5.2.3.4)<br/>
-                    <small>Kerberos PKINIT client authentication / Autenticazione client Kerberos PKINIT</small>
-                </FluentCheckbox>
-                <FluentCheckbox @bind-Value=KerberosPkinitKdc>
-                    <strong>Kerberos PKINIT KDC</strong> (1.3.6.1.5.2.3.5)<br/>
-                    <small>Kerberos PKINIT KDC authentication / Autenticazione KDC Kerberos PKINIT</small>
-                </FluentCheckbox>
-            </FluentAccordionItem>
-        </FluentAccordion>
+        <div class="oid-option-list">
+            @foreach(var option in FilteredOidOptions)
+            {
+                <label class="oid-option-row">
+                    <input type="checkbox"
+                           checked="@GetOidSelection(option.Key)"
+                           @onchange="args => SetOidSelection(option.Key, args.Value is true)" />
+                    <span class="oid-option-text">
+                        <span class="oid-option-main">
+                            <strong>@option.Name</strong>
+                            <code>@option.Oid</code>
+                        </span>
+                        <span class="oid-option-description">@option.Description</span>
+                        <span class="oid-option-category">@option.Category</span>
+                    </span>
+                </label>
+            }
+        </div>
     </FluentStack>
 
 
     <FluentStack xs="12">
         <FluentButton IconStart="@(new Icons.Regular.Size16.GlobeArrowUp())" OnClick="() => AddDNSText()">AddDNS</FluentButton>
+        <FluentButton IconStart="@(new Icons.Regular.Size16.GlobeArrowUp())" OnClick="() => AddIpText()">AddIP</FluentButton>
     </FluentStack>
 
     <div style="margin-top: 1rem;">
@@ -210,6 +98,24 @@
 
                     <FluentButton IconEnd="@(new Icons.Regular.Size16.Delete())"
                                   OnClick="@(() => Remove(index))" />
+                </FluentStack>
+            }
+        </div>
+    </div>
+
+    <div style="margin-top: 1rem;">
+        <div class="wrap-container">
+            @for(int i = 0; i < IPStrings.Count; i++)
+            {
+                var index = i;
+
+                <FluentStack ItemSpacing="5" Orientation="Orientation.Horizontal" class="flex-item">
+                    <FluentTextArea style="width: 300px;"
+                                    Placeholder="@($"IP {index + 1}")"
+                                    @bind-Value="IPStrings[index]" />
+
+                    <FluentButton IconEnd="@(new Icons.Regular.Size16.Delete())"
+                                  OnClick="@(() => RemoveIp(index))" />
                 </FluentStack>
             }
         </div>
@@ -254,15 +160,27 @@
 
     string Solution { get; set; } = "APP_X";
     string Name { get; set; } = ""; // Human-friendly name for certificate organization
-    string CertificateAddress { get; set; } = "localhost";
     string Company { get; set; } = "NXT";
+    string OrganizationalUnit { get; set; } = "";
+    string Locality { get; set; } = "Pisa";
+    string State { get; set; } = "PI";
+    string Country { get; set; } = "IT";
     string CommonName { get; set; } = "server";
     string Password { get; set; } = "secret";
+    DateTime? ValidFrom { get; set; } = DateTime.UtcNow.Date;
+    DateTime? ValidTo { get; set; } = DateTime.UtcNow.Date.AddYears(10);
 
     string MakeOutput { get; set; } = "";
 
     public string IDString { get; set; } = "";
     public bool Created = false;
+    string OidFilter { get; set; } = "";
+
+    public bool KeyUsageDigitalSignature { get; set; } = true;
+    public bool KeyUsageNonRepudiation { get; set; } = false;
+    public bool KeyUsageKeyEncipherment { get; set; } = false;
+    public bool KeyUsageDataEncipherment { get; set; } = false;
+    public bool KeyUsageKeyAgreement { get; set; } = false;
     
     // OID Checkboxes - Standard SSL/TLS
     public bool ServerAuthentication { get; set; } = true; // Default for server
@@ -359,6 +277,158 @@
         { "KerberosPkinitClientAuth", "1.3.6.1.5.2.3.4" },
         { "KerberosPkinitKdc", "1.3.6.1.5.2.3.5" }
     };
+
+    private sealed record OidOption(string Key, string Name, string Oid, string Description, string Category);
+
+    private List<OidOption> OidOptions => new()
+    {
+        new("ServerAuthentication", "Server Authentication", OidMapping["ServerAuthentication"], "HTTPS server, TLS/SSL server authentication", "Standard SSL/TLS"),
+        new("ClientAuthentication", "Client Authentication", OidMapping["ClientAuthentication"], "mTLS client, TLS/SSL client authentication", "Standard SSL/TLS"),
+        new("CodeSigning", "Code Signing", OidMapping["CodeSigning"], "Signing of downloadable executable code", "Standard SSL/TLS"),
+        new("EmailProtection", "Email Protection", OidMapping["EmailProtection"], "S/MIME email protection", "Standard SSL/TLS"),
+        new("TimeStamping", "Time Stamping", OidMapping["TimeStamping"], "Trusted timestamping", "Standard SSL/TLS"),
+        new("OcspSigning", "OCSP Signing", OidMapping["OcspSigning"], "Signing OCSP responses", "Standard SSL/TLS"),
+        new("IpsecEndSystem", "IPSec End System", OidMapping["IpsecEndSystem"], "IPsec end system authentication", "IPSec"),
+        new("IpsecTunnel", "IPSec Tunnel", OidMapping["IpsecTunnel"], "IPsec tunnel authentication", "IPSec"),
+        new("IpsecUser", "IPSec User", OidMapping["IpsecUser"], "IPsec user authentication", "IPSec"),
+        new("IpsecIke", "IPSEC IKE", OidMapping["IpsecIke"], "IPsec Internet Key Exchange", "IPSec"),
+        new("MsTrustListSigning", "Microsoft Trust List Signing", OidMapping["MsTrustListSigning"], "Signing certificate trust lists", "Microsoft Specific"),
+        new("MsTimeStamping", "Microsoft Time Stamping", OidMapping["MsTimeStamping"], "Microsoft timestamping service", "Microsoft Specific"),
+        new("MsServerGatedCrypto", "Microsoft Server Gated Crypto", OidMapping["MsServerGatedCrypto"], "Legacy strong cryptography", "Microsoft Specific"),
+        new("MsEncryptedFileSystem", "Microsoft Encrypted File System", OidMapping["MsEncryptedFileSystem"], "Windows EFS encryption", "Microsoft Specific"),
+        new("MsFileRecovery", "Microsoft File Recovery", OidMapping["MsFileRecovery"], "File recovery agent", "Microsoft Specific"),
+        new("MsWindowsSystemComponentVerification", "Microsoft Windows System Component Verification", OidMapping["MsWindowsSystemComponentVerification"], "Windows system component verification", "Microsoft Specific"),
+        new("MsOemWindowsSystemComponentVerification", "Microsoft OEM Windows System Component Verification", OidMapping["MsOemWindowsSystemComponentVerification"], "OEM Windows component verification", "Microsoft Specific"),
+        new("MsEmbeddedWindowsSystemComponentVerification", "Microsoft Embedded Windows System Component Verification", OidMapping["MsEmbeddedWindowsSystemComponentVerification"], "Embedded Windows component verification", "Microsoft Specific"),
+        new("MsRootListSigner", "Microsoft Root List Signer", OidMapping["MsRootListSigner"], "Signing root certificate lists", "Microsoft Specific"),
+        new("MsQualifiedSubordination", "Microsoft Qualified Subordination", OidMapping["MsQualifiedSubordination"], "Qualified subordinate CA", "Microsoft Specific"),
+        new("MsKeyRecovery", "Microsoft Key Recovery", OidMapping["MsKeyRecovery"], "Key recovery agent", "Microsoft Specific"),
+        new("MsDocumentSigning", "Microsoft Document Signing", OidMapping["MsDocumentSigning"], "Document signing", "Microsoft Specific"),
+        new("MsLifetimeSigning", "Microsoft Lifetime Signing", OidMapping["MsLifetimeSigning"], "Lifetime signing", "Microsoft Specific"),
+        new("MsSmartCardLogon", "Microsoft Smart Card Logon", OidMapping["MsSmartCardLogon"], "Smart card logon", "Microsoft Specific"),
+        new("MsKernelModeCodeSigning", "Microsoft Kernel Mode Code Signing", OidMapping["MsKernelModeCodeSigning"], "Kernel-mode driver signing", "Microsoft Specific"),
+        new("Dvcs", "DVCS", OidMapping["Dvcs"], "Data Validation and Certification Server", "Network & Authentication"),
+        new("SbgpCertificate", "SBGP Certificate", OidMapping["SbgpCertificate"], "Secure BGP certificate", "Network & Authentication"),
+        new("EapOverPpp", "EAP Over PPP", OidMapping["EapOverPpp"], "EAP over PPP authentication", "Network & Authentication"),
+        new("EapOverLan", "EAP Over LAN", OidMapping["EapOverLan"], "EAP over LAN authentication", "Network & Authentication"),
+        new("ScvpServer", "SCVP Server", OidMapping["ScvpServer"], "SCVP server certificate validation", "Network & Authentication"),
+        new("ScvpClient", "SCVP Client", OidMapping["ScvpClient"], "SCVP client certificate validation", "Network & Authentication"),
+        new("CapwapAc", "CAPWAP AC", OidMapping["CapwapAc"], "CAPWAP Access Controller", "Network & Authentication"),
+        new("CapwapWtp", "CAPWAP WTP", OidMapping["CapwapWtp"], "CAPWAP Wireless Termination Point", "Network & Authentication"),
+        new("SipDomain", "SIP Domain", OidMapping["SipDomain"], "SIP domain certificate", "Network & Authentication"),
+        new("SshClient", "SSH Client", OidMapping["SshClient"], "SSH client certificate authentication", "Network & Authentication"),
+        new("SshServer", "SSH Server", OidMapping["SshServer"], "SSH server certificate authentication", "Network & Authentication"),
+        new("KerberosPkinitClientAuth", "Kerberos PKINIT Client Auth", OidMapping["KerberosPkinitClientAuth"], "Kerberos PKINIT client authentication", "Network & Authentication"),
+        new("KerberosPkinitKdc", "Kerberos PKINIT KDC", OidMapping["KerberosPkinitKdc"], "Kerberos PKINIT KDC authentication", "Network & Authentication")
+    };
+
+    private IEnumerable<OidOption> FilteredOidOptions => OidOptions.Where(MatchesOidFilter);
+
+    private bool MatchesOidFilter(OidOption option)
+    {
+        var filter = OidFilter?.Trim();
+        if(string.IsNullOrEmpty(filter) || filter == "*")
+        {
+            return true;
+        }
+
+        var values = new[] { option.Name, option.Oid, option.Description, option.Category };
+        if(!filter.Contains('*'))
+        {
+            return values.Any(value => value.Contains(filter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var pattern = "^" + Regex.Escape(filter).Replace("\\*", ".*") + "$";
+        return values.Any(value => Regex.IsMatch(value, pattern, RegexOptions.IgnoreCase));
+    }
+
+    private bool GetOidSelection(string key) => key switch
+    {
+        "ServerAuthentication" => ServerAuthentication,
+        "ClientAuthentication" => ClientAuthentication,
+        "CodeSigning" => CodeSigning,
+        "EmailProtection" => EmailProtection,
+        "TimeStamping" => TimeStamping,
+        "OcspSigning" => OcspSigning,
+        "IpsecEndSystem" => IpsecEndSystem,
+        "IpsecTunnel" => IpsecTunnel,
+        "IpsecUser" => IpsecUser,
+        "IpsecIke" => IpsecIke,
+        "MsTrustListSigning" => MsTrustListSigning,
+        "MsTimeStamping" => MsTimeStamping,
+        "MsServerGatedCrypto" => MsServerGatedCrypto,
+        "MsEncryptedFileSystem" => MsEncryptedFileSystem,
+        "MsFileRecovery" => MsFileRecovery,
+        "MsWindowsSystemComponentVerification" => MsWindowsSystemComponentVerification,
+        "MsOemWindowsSystemComponentVerification" => MsOemWindowsSystemComponentVerification,
+        "MsEmbeddedWindowsSystemComponentVerification" => MsEmbeddedWindowsSystemComponentVerification,
+        "MsRootListSigner" => MsRootListSigner,
+        "MsQualifiedSubordination" => MsQualifiedSubordination,
+        "MsKeyRecovery" => MsKeyRecovery,
+        "MsDocumentSigning" => MsDocumentSigning,
+        "MsLifetimeSigning" => MsLifetimeSigning,
+        "MsSmartCardLogon" => MsSmartCardLogon,
+        "MsKernelModeCodeSigning" => MsKernelModeCodeSigning,
+        "Dvcs" => Dvcs,
+        "SbgpCertificate" => SbgpCertificate,
+        "EapOverPpp" => EapOverPpp,
+        "EapOverLan" => EapOverLan,
+        "ScvpServer" => ScvpServer,
+        "ScvpClient" => ScvpClient,
+        "CapwapAc" => CapwapAc,
+        "CapwapWtp" => CapwapWtp,
+        "SipDomain" => SipDomain,
+        "SshClient" => SshClient,
+        "SshServer" => SshServer,
+        "KerberosPkinitClientAuth" => KerberosPkinitClientAuth,
+        "KerberosPkinitKdc" => KerberosPkinitKdc,
+        _ => false
+    };
+
+    private void SetOidSelection(string key, bool value)
+    {
+        switch(key)
+        {
+            case "ServerAuthentication": ServerAuthentication = value; break;
+            case "ClientAuthentication": ClientAuthentication = value; break;
+            case "CodeSigning": CodeSigning = value; break;
+            case "EmailProtection": EmailProtection = value; break;
+            case "TimeStamping": TimeStamping = value; break;
+            case "OcspSigning": OcspSigning = value; break;
+            case "IpsecEndSystem": IpsecEndSystem = value; break;
+            case "IpsecTunnel": IpsecTunnel = value; break;
+            case "IpsecUser": IpsecUser = value; break;
+            case "IpsecIke": IpsecIke = value; break;
+            case "MsTrustListSigning": MsTrustListSigning = value; break;
+            case "MsTimeStamping": MsTimeStamping = value; break;
+            case "MsServerGatedCrypto": MsServerGatedCrypto = value; break;
+            case "MsEncryptedFileSystem": MsEncryptedFileSystem = value; break;
+            case "MsFileRecovery": MsFileRecovery = value; break;
+            case "MsWindowsSystemComponentVerification": MsWindowsSystemComponentVerification = value; break;
+            case "MsOemWindowsSystemComponentVerification": MsOemWindowsSystemComponentVerification = value; break;
+            case "MsEmbeddedWindowsSystemComponentVerification": MsEmbeddedWindowsSystemComponentVerification = value; break;
+            case "MsRootListSigner": MsRootListSigner = value; break;
+            case "MsQualifiedSubordination": MsQualifiedSubordination = value; break;
+            case "MsKeyRecovery": MsKeyRecovery = value; break;
+            case "MsDocumentSigning": MsDocumentSigning = value; break;
+            case "MsLifetimeSigning": MsLifetimeSigning = value; break;
+            case "MsSmartCardLogon": MsSmartCardLogon = value; break;
+            case "MsKernelModeCodeSigning": MsKernelModeCodeSigning = value; break;
+            case "Dvcs": Dvcs = value; break;
+            case "SbgpCertificate": SbgpCertificate = value; break;
+            case "EapOverPpp": EapOverPpp = value; break;
+            case "EapOverLan": EapOverLan = value; break;
+            case "ScvpServer": ScvpServer = value; break;
+            case "ScvpClient": ScvpClient = value; break;
+            case "CapwapAc": CapwapAc = value; break;
+            case "CapwapWtp": CapwapWtp = value; break;
+            case "SipDomain": SipDomain = value; break;
+            case "SshClient": SshClient = value; break;
+            case "SshServer": SshServer = value; break;
+            case "KerberosPkinitClientAuth": KerberosPkinitClientAuth = value; break;
+            case "KerberosPkinitKdc": KerberosPkinitKdc = value; break;
+        }
+    }
     
     // Helper method to get selected OIDs
     private string GetSelectedOids()
@@ -531,7 +601,8 @@
     // public string DNS5 { get; set; } = "";
     // public string DNS6 { get; set; } = "";
 
-    public List<string> DNSStrings;
+    public List<string> DNSStrings = new();
+    public List<string> IPStrings = new();
     public void SetDns(int index, string text)
     {
         DNSStrings[index] = text;
@@ -543,39 +614,108 @@
             DNSStrings.RemoveAt(index);
         }
     }
+
+    private string[] GetSelectedKeyUsages()
+    {
+        var selectedKeyUsages = new List<string>();
+
+        if(KeyUsageDigitalSignature) selectedKeyUsages.Add("DigitalSignature");
+        if(KeyUsageNonRepudiation) selectedKeyUsages.Add("NonRepudiation");
+        if(KeyUsageKeyEncipherment) selectedKeyUsages.Add("KeyEncipherment");
+        if(KeyUsageDataEncipherment) selectedKeyUsages.Add("DataEncipherment");
+        if(KeyUsageKeyAgreement) selectedKeyUsages.Add("KeyAgreement");
+
+        return selectedKeyUsages.Count > 0 ? selectedKeyUsages.ToArray() : ["DigitalSignature"];
+    }
+
+    private void SetKeyUsageCheckboxes(string[]? keyUsages)
+    {
+        KeyUsageDigitalSignature = false;
+        KeyUsageNonRepudiation = false;
+        KeyUsageKeyEncipherment = false;
+        KeyUsageDataEncipherment = false;
+        KeyUsageKeyAgreement = false;
+
+        foreach(var keyUsage in keyUsages ?? ["DigitalSignature"])
+        {
+            if(string.Equals(keyUsage, "DigitalSignature", StringComparison.OrdinalIgnoreCase)) KeyUsageDigitalSignature = true;
+            else if(string.Equals(keyUsage, "NonRepudiation", StringComparison.OrdinalIgnoreCase)) KeyUsageNonRepudiation = true;
+            else if(string.Equals(keyUsage, "KeyEncipherment", StringComparison.OrdinalIgnoreCase)) KeyUsageKeyEncipherment = true;
+            else if(string.Equals(keyUsage, "DataEncipherment", StringComparison.OrdinalIgnoreCase)) KeyUsageDataEncipherment = true;
+            else if(string.Equals(keyUsage, "KeyAgreement", StringComparison.OrdinalIgnoreCase)) KeyUsageKeyAgreement = true;
+        }
+    }
+
+    private void RemoveIp(int index)
+    {
+        if(index >= 0 && index < IPStrings.Count)
+        {
+            IPStrings.RemoveAt(index);
+        }
+    }
+
     public void AddDNSText()
     {
-        DNSStrings.Add($"{DNSStrings.Count}");
+        DNSStrings.Add("");
         StateHasChanged();
     }
 
+    public void AddIpText()
+    {
+        IPStrings.Add("");
+        StateHasChanged();
+    }
+
+    private void OnOidFilterChanged(ChangeEventArgs args)
+    {
+        OidFilter = args.Value?.ToString() ?? "";
+    }
 
     protected async override Task OnInitializedAsync()
     {
         // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
         DNSStrings  = new List<string>() { "" };
+        IPStrings  = new List<string>() { "" };
 
         if(ID != -1)
         {
             DNSStrings.Clear();
             var cert = await ViewModel.GetCertificateID(ID);
+            if(cert is null)
+            {
+                return;
+            }
 
-            Solution = cert.Solution;
+            Solution = cert.Solution ?? "";
             Name = cert.Name ?? "";
-            Password = cert.Password;
-            CertificateAddress = cert.Address;
-            CommonName = cert.CN;
-            Company = cert.Company;
+            Password = cert.Password ?? "";
+            CommonName = cert.CN ?? "";
+            Company = cert.Company ?? "";
+            OrganizationalUnit = cert.OrganizationalUnit ?? "";
+            Locality = cert.Locality ?? "Pisa";
+            State = cert.State ?? "PI";
+            Country = cert.Country ?? "IT";
+            ValidFrom = (cert.ValidFromUtc ?? DateTimeOffset.UtcNow).UtcDateTime.Date;
+            ValidTo = (cert.ValidToUtc ?? DateTimeOffset.UtcNow.AddYears(10)).UtcDateTime.Date;
 
             // Set OID checkboxes from certificate
             SetOidCheckboxes(cert.Oid);
+            SetKeyUsageCheckboxes(cert.KeyUsages);
 
-            foreach(var dns in cert.DNS)
+            foreach(var dns in cert.DNS ?? [])
             {
                 if(string.IsNullOrEmpty(dns))
                     continue;
 
                 DNSStrings.Add(dns);
+            }
+
+            foreach(var ip in cert.IpAddresses ?? [])
+            {
+                if(string.IsNullOrEmpty(ip))
+                    continue;
+
+                IPStrings.Add(ip);
             }
 
         }
@@ -587,7 +727,38 @@
     public async void MakeCrt()
     {
         var oid = GetSelectedOids();
-        var result = await ViewModel.Make(Company, CertificateAddress, oid, Solution, Name, CommonName, Password, DNSStrings.ToArray());
+        if(ValidFrom is null || ValidTo is null)
+        {
+            await JSRuntime.InvokeVoidAsync("showAlert", "Certificate validity dates are not valid");
+            return;
+        }
+
+        var validFromUtc = new DateTimeOffset(DateTime.SpecifyKind(ValidFrom.Value.Date, DateTimeKind.Utc));
+        var validToUtc = new DateTimeOffset(DateTime.SpecifyKind(ValidTo.Value.Date, DateTimeKind.Utc));
+
+        var request = new CertificateGenerationRequest
+        {
+            Solution = Solution,
+            Name = Name,
+            CommonName = CommonName,
+            Organization = Company,
+            OrganizationalUnit = OrganizationalUnit,
+            Locality = Locality,
+            State = State,
+            Country = Country,
+            PfxPassword = Password,
+            DnsNames = DNSStrings.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray(),
+            IpAddresses = IPStrings.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray(),
+            KeyUsages = GetSelectedKeyUsages(),
+            EnhancedKeyUsages = oid.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            ValidFromUtc = validFromUtc,
+            ValidToUtc = validToUtc,
+            KeyAlgorithm = CertificatePrivateKeyAlgorithm.EcdsaP256,
+            SignatureHashAlgorithm = "SHA384",
+            ExportPrivateKeyPem = true
+        };
+
+        var result = await ViewModel.Make(request);
 
         foreach(var res in result ?? new ())
         {

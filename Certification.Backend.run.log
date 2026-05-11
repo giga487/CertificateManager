@@ -1,0 +1,13 @@
+Using launch settings from Certification.Backend\Properties\launchSettings.json...
+Building...
+15:48:29:937 [INF] [Certification Backend] Resolving CA root thumbprint D23B4308A2C25222359A707063DD6BE2CF2B61B1 across 3 configured certificate stores.
+15:48:29:974 [INF] [Certification Backend] Searched CA root in LocalMachine/My. Matches=0.
+15:48:29:981 [INF] [Certification Backend] Searched CA root in LocalMachine/Root. Matches=1.
+15:48:29:982 [INF] [Certification Backend] Found CA candidate D23B4308A2C25222359A707063DD6BE2CF2B61B1 in LocalMachine/Root. HasPrivateKey=True
+15:48:29:983 [INF] [Certification Backend] Searched CA root in LocalMachine/CertificateAuthority. Matches=0.
+15:48:29:989 [INF] [Certification.Backend.Services.StartupClass] Working in C:\Work\repository\CertificateManager\Certification.Backend\bin\Debug\net10.0\
+15:48:29:989 [INF] [Certification.Backend.Services.StartupClass] Starting the backend application
+15:48:30:047 [INF] [Microsoft.Hosting.Lifetime] Now listening on: http://localhost:5082
+15:48:30:049 [INF] [Microsoft.Hosting.Lifetime] Application started. Press Ctrl+C to shut down.
+15:48:30:049 [INF] [Microsoft.Hosting.Lifetime] Hosting environment: Development
+15:48:30:050 [INF] [Microsoft.Hosting.Lifetime] Content root path: C:\Work\repository\CertificateManager\Certification.Backend

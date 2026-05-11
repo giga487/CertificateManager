@@ -66,20 +66,11 @@ namespace CertificateManager.Controllers
         }
 
         [HttpPost("MakeCertificate")]
-        public IActionResult MakeCertificate([FromBody] Certificate certificate)
+        public IActionResult MakeCertificate([FromBody] CertificateGenerationRequest certificate)
         {
             try
             {
-                var result = _certificationManager?.CreatingPFX_CRT(
-                    serverAddress: certificate.Address,
-                    oid: certificate.Oid,
-                    company: certificate.Company,
-                    commonName: certificate.CN,
-                    exportPWD: certificate.Password,
-                    expiring: DateTimeOffset.Now + TimeSpan.FromDays(3650),
-                    solutionFolder: certificate.Solution,
-                    name: certificate.Name,
-                    serverDNS: certificate.DNS);
+                var result = _certificationManager?.CreatingPFX_CRT(certificate);
 
                 return Ok(result);
             }

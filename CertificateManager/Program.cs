@@ -1,15 +1,9 @@
 using CertificateCommon;
 using CertificateManager.Client;
-using CertificateManager.Client.Pages;
 using CertificateManager.Client.src;
 using CertificateManager.Client.src.Models;
-using CertificateManager.Components;
 using CertificateManager.src;
 using Common;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.FluentUI.AspNetCore.Components;
 using Serilog;
 using Serilog.Events;
 
@@ -31,10 +25,6 @@ namespace CertificateManager
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-            builder.Services.AddRazorComponents()
-                .AddInteractiveWebAssemblyComponents();
-            builder.Services.AddFluentUIComponents();
-
             LoggerBuilder<CertificationManagerLogEvent> loggbuilder = new LoggerBuilder<CertificationManagerLogEvent>("LOG/Cert.Log");
 
             Logger = loggbuilder.GetContext("Certificate Manager");
@@ -73,15 +63,13 @@ namespace CertificateManager
                 app.UseHsts();
             }
 
-            app.MapControllers();
             app.UseHttpsRedirection();
 
+            app.UseBlazorFrameworkFiles();
             app.UseStaticFiles();
-            app.UseAntiforgery();
 
-            app.MapRazorComponents<App>()
-                .AddInteractiveWebAssemblyRenderMode()
-                .AddAdditionalAssemblies(typeof(Client._Imports).Assembly);
+            app.MapControllers();
+            app.MapFallbackToFile("index.html");
 
             app.Run();
         }
