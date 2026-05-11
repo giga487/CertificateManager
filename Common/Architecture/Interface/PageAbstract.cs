@@ -8,6 +8,8 @@ namespace Common.src.Architecture.BaseClass
 
     public abstract class Page<T> : ComponentBase, IAsyncDisposable where T : IViewModel
     {
+        private bool _disposed;
+
         [Inject]
         [NotNull]
         public T? ViewModel { get; set; }
@@ -19,7 +21,18 @@ namespace Common.src.Architecture.BaseClass
 
         private void OnStateChange(object? sender, PropertyChangedEventArgs e)
         {
-            StateHasChanged();
+            if(_disposed)
+            {
+                return;
+            }
+
+            _ = InvokeAsync(() =>
+            {
+                if(!_disposed)
+                {
+                    StateHasChanged();
+                }
+            });
         }
         protected override void OnInitialized()
         {
@@ -34,10 +47,24 @@ namespace Common.src.Architecture.BaseClass
 
         public async ValueTask DisposeAsync()
         {
+            if(_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
             if(ViewModel is not null)
             {
                 ViewModel.PropertyChanged -= OnStateChange;
-                await ViewModel.DisposeAsync();
+                try
+                {
+                    await ViewModel.DisposeAsync();
+                }
+                catch(Exception ex)
+                {
+                    _logger?.Warning(ex, "Error disposing the {ViewModel} model view", typeof(T).Name);
+                }
             }
 
         }

@@ -5,6 +5,12 @@
 /CertificateManager.Client/obj
 /CertificateManager/bin
 /CertificateManager/obj
+/Certification.Backend/bin
+/Certification.Backend/obj
+/Certification.Backend/LOG
+/Certification.Backend/Output
+/Certification.Frontend/bin
+/Certification.Frontend/obj
 /Common/bin
 /Common/obj
 /publish

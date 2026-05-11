@@ -27,27 +27,30 @@ namespace CertificateCommon
 
     public class CertificationManager
     {
+        private sealed record CertificateStoreSearchLocation(StoreName StoreName, StoreLocation StoreLocation);
+
         public string? CARootThumbprint { get; private set; }
         public Serilog.ILogger? Logger { get; set; }
         //public byte[] LastSerialNumber { get; set; } = new byte[] { 0, 0, 0, 0 };
         public Int32 LastSerialNumber { get; private set; }
         string _dir { get; init; } = "Output";
         public FileManagerCertificate? FileManager { get; init; }
+        private IReadOnlyList<CertificateStoreSearchLocation> CertificateAuthorityStores { get; init; } = DefaultCertificateAuthorityStores;
 
         public CertificationManager(IConfiguration configuration, Serilog.ILogger logger, FileManagerCertificate fileManager)
         {
             Logger = logger;
-            CARootThumbprint = configuration.GetSection("CertificationManager").GetSection("CARootThumbPrint").Value;
-            CARoot = Get(CARootThumbprint, X509FindType.FindByThumbprint, StoreName.Root, StoreLocation.CurrentUser);
-            var outputData = configuration.GetSection("CertificationManager").GetSection("Output").Value;
+            var certificationManagerSection = configuration.GetSection("CertificationManager");
+            CARootThumbprint = certificationManagerSection.GetSection("CARootThumbPrint").Value;
+            CertificateAuthorityStores = ReadCertificateAuthorityStores(certificationManagerSection);
+            CARoot = ResolveCertificateAuthority(CARootThumbprint);
+            var outputOptions = CertificateOutputOptions.FromConfiguration(configuration);
+            var outputData = outputOptions.PrimaryOutput;
             LastSerialNumber = 0;
 
             FileManager = fileManager;
 
-            if(!string.IsNullOrEmpty(outputData) && !Directory.Exists(outputData))
-            {
-                Directory.CreateDirectory(outputData);
-            }
+            outputOptions.EnsureDirectories();
 
             _dir = outputData;
         }
@@ -55,11 +58,21 @@ namespace CertificateCommon
         public CertificationManager(string caRootThumbprint, int lastSerialNumber)
         {
             CARootThumbprint = caRootThumbprint;
-            CARoot = Get(CARootThumbprint, X509FindType.FindByThumbprint, StoreName.My, StoreLocation.CurrentUser);
+            CARoot = ResolveCertificateAuthority(CARootThumbprint);
             LastSerialNumber = lastSerialNumber;
         }
 
         public X509Certificate2? CARoot { get; protected set; } = null;
+
+        private static readonly IReadOnlyList<CertificateStoreSearchLocation> DefaultCertificateAuthorityStores =
+        [
+            new(StoreName.My, StoreLocation.CurrentUser),
+            new(StoreName.Root, StoreLocation.CurrentUser),
+            new(StoreName.CertificateAuthority, StoreLocation.CurrentUser),
+            new(StoreName.My, StoreLocation.LocalMachine),
+            new(StoreName.Root, StoreLocation.LocalMachine),
+            new(StoreName.CertificateAuthority, StoreLocation.LocalMachine)
+        ];
 
         public X509Certificate2Collection GetCollection(string? parameter, X509FindType findType, StoreName storeName, StoreLocation storeLocation)
         {
@@ -71,13 +84,27 @@ namespace CertificateCommon
             using(var store = new X509Store(storeName, storeLocation))
             {
                 store.Open(OpenFlags.ReadOnly);
+                var searchValue = findType == X509FindType.FindByThumbprint
+                    ? NormalizeThumbprint(parameter)
+                    : parameter;
 
                 // Cerca il certificato. Il 'true' indica di cercare solo i certificati validi.
                 var certCollection = store.Certificates.Find(
                     findType,
-                    parameter,
+                    searchValue,
                     validOnly: false // Cerca anche i certificati scaduti
                 );
+
+                if(certCollection.Count == 0 && findType == X509FindType.FindByThumbprint)
+                {
+                    foreach(var certificate in store.Certificates)
+                    {
+                        if(string.Equals(NormalizeThumbprint(certificate.Thumbprint), searchValue, StringComparison.OrdinalIgnoreCase))
+                        {
+                            certCollection.Add(certificate);
+                        }
+                    }
+                }
 
                 return certCollection;
                 // Se la collezione contiene almeno un certificato, significa che è stato trovato.
@@ -116,11 +143,11 @@ namespace CertificateCommon
                 using (var memoryStream = new MemoryStream())
                 {
                     // 2. Open the read stream from the IFormFile
-                    // In a real application, consider adding a size limit here: 
+                    // In a real application, consider adding a size limit here:
                     // using (var fileStream = file.OpenReadStream(maxAllowedSize))
                     using (var fileStream = file.OpenReadStream())
                     {
-                        // 3. Asynchronously copy the content from the file stream 
+                        // 3. Asynchronously copy the content from the file stream
                         //    to the memory stream. This is efficient for I/O operations.
                         await fileStream.CopyToAsync(memoryStream);
                     }
@@ -185,7 +212,7 @@ namespace CertificateCommon
 
             // Create a collection to hold the final PFX certificates
             X509Certificate2Collection collection = new X509Certificate2Collection();
-            
+
             // Import all certificates found in the PEM (this captures the chain)
             X509Certificate2Collection chainParam = new X509Certificate2Collection();
             try
@@ -255,7 +282,7 @@ namespace CertificateCommon
                 {
                     certificate = X509Certificate2.CreateFromPem(certPem);
                 }
-                
+
             }
 
             catch(CryptographicException ex)
@@ -327,8 +354,14 @@ namespace CertificateCommon
             }
         }
 
-        public List<CertficateFileInfo> CreatingPFX_CRT(string? commonName, string? oid, string? serverAddress, string? company, string? exportPWD, DateTimeOffset expiring, string? solutionFolder, string? name = null, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt", params string[] serverDNS)
+        public List<CertficateFileInfo> CreatingPFX_CRT(CertificateGenerationRequest request, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt")
         {
+            var validationErrors = request.Validate();
+            if(validationErrors.Count > 0)
+            {
+                throw new ArgumentException(string.Join(Environment.NewLine, validationErrors));
+            }
+
             List<CertficateFileInfo> fileInfo = new List<CertficateFileInfo>();
             using var serverKey = ECDsa.Create(ECCurve.NamedCurves.nistP256); // Uso di ECDsa come da te suggerito
 
@@ -337,7 +370,7 @@ namespace CertificateCommon
                 throw new CARootNotFoundException();
             }
 
-            X509Certificate2? x509Son = CreateCASon(commonName: commonName, oid: oid, serverAddress, company, serverKey, expiring, serverDNS: serverDNS);
+            X509Certificate2? x509Son = CreateCertificate(request, serverKey, CARoot, isCertificateAuthority: false);
 
             if(x509Son is null)
             {
@@ -350,9 +383,9 @@ namespace CertificateCommon
             }
 
             // Build path: Output/Solution/Name or Output/Solution if Name is not provided
-            string path = string.IsNullOrEmpty(name) 
-                ? Path.Combine(_dir, solutionFolder)
-                : Path.Combine(_dir, solutionFolder, name);
+            string path = string.IsNullOrEmpty(request.Name)
+                ? Path.Combine(_dir, request.Solution!)
+                : Path.Combine(_dir, request.Solution!, request.Name);
 
             if(!Directory.Exists(path))
             {
@@ -360,12 +393,12 @@ namespace CertificateCommon
             }
 
             var serverPfx = x509Son!.CopyWithPrivateKey(serverKey);
-            if(!string.IsNullOrEmpty(exportPWD) && serverPfx is not null)
+            if(!string.IsNullOrEmpty(request.PfxPassword) && serverPfx is not null)
             {
                 try
                 {
                     string pfxFileName = Path.Join(path, pfxName);
-                    File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, exportPWD));
+                    File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, request.PfxPassword));
                     fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son));
 
                     string certFileName = Path.Join(path, certName);
@@ -376,7 +409,7 @@ namespace CertificateCommon
 
                     using ECDsa? ecKey = serverPfx.GetECDsaPrivateKey();
 
-                    if(ecKey != null)
+                    if(request.ExportPrivateKeyPem && ecKey != null)
                     {
                         // Esporta in formato PEM standard (quello che inizia con -----BEGIN PRIVATE KEY-----)
                         string privateKeyPem = ecKey.ExportPkcs8PrivateKeyPem();
@@ -386,7 +419,7 @@ namespace CertificateCommon
                         File.WriteAllText(privateKeyFName, privateKeyPem);
                         Logger?.Information("Private key generated: 'private.key'");
                     }
-                    else
+                    else if(request.ExportPrivateKeyPem)
                     {
                         Logger?.Error("Impossibile to fix the private key files");
                     }
@@ -395,9 +428,12 @@ namespace CertificateCommon
                     string certFileNameRoot = Path.Join(path, "Root.crt");
                     fileInfo.Add(ExtractRoot(certFileNameRoot));
 
-                    FileManager?.Add(commonName: commonName, company: company, oid: oid,
-                        pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: solutionFolder, 
-                        name: name, password: exportPWD, rootThumbprint: CARoot.Thumbprint, address: serverAddress, dns: serverDNS);
+                    FileManager?.Add(commonName: request.CommonName!, company: request.Organization!, oid: string.Join(",", request.EnhancedKeyUsages),
+                        pfxFile: pfxFileName, crtRoot: certFileNameRoot, solution: request.Solution!,
+                        name: request.Name, password: request.PfxPassword!, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), dns: request.DnsNames,
+                        ipAddresses: request.IpAddresses, organizationalUnit: request.OrganizationalUnit, locality: request.Locality, state: request.State,
+                        country: request.Country, validFromUtc: request.ValidFromUtc, validToUtc: request.ValidToUtc, keyUsages: request.KeyUsages, keyAlgorithm: request.KeyAlgorithm.ToString(),
+                        signatureHashAlgorithm: request.SignatureHashAlgorithm);
 
                 }
                 catch(Exception ex)
@@ -408,6 +444,26 @@ namespace CertificateCommon
             }
 
             return fileInfo;
+        }
+
+        public List<CertficateFileInfo> CreatingPFX_CRT(string? commonName, string? oid, string? serverAddress, string? company, string? exportPWD, DateTimeOffset expiring, string? solutionFolder, string? name = null, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt", params string[] serverDNS)
+        {
+            var request = new CertificateGenerationRequest
+            {
+                CommonName = commonName,
+                Organization = company,
+                Solution = solutionFolder,
+                Name = name,
+                PfxPassword = exportPWD,
+                DnsNames = BuildLegacyDnsNames(serverAddress, serverDNS),
+                IpAddresses = BuildLegacyIpAddresses(serverAddress),
+                KeyUsages = ["DigitalSignature"],
+                EnhancedKeyUsages = SplitOidList(oid),
+                ValidFromUtc = DateTimeOffset.UtcNow,
+                ValidToUtc = expiring
+            };
+
+            return CreatingPFX_CRT(request, pfxName, certName);
         }
 
         public bool IsLocalHost(string serverAddress)
@@ -446,126 +502,235 @@ namespace CertificateCommon
 
         public X509Certificate2? CreateCASon(string? commonName, string? oid, string? serverAddress, string? company, ECDsa privateKey, DateTimeOffset expiring, string? friendlyName = "", params string[] serverDNS)
         {
-            if(CARoot is null)
+            return CreateCASon(commonName, oid, serverAddress, company, privateKey, expiring, CARoot, false, friendlyName, serverDNS);
+        }
+
+        public X509Certificate2? CreateCASon(string? commonName, string? oid, string? serverAddress, string? company, ECDsa privateKey, DateTimeOffset expiring, X509Certificate2? issuer, bool isCertificateAuthority, string? friendlyName = "", params string[] serverDNS)
+        {
+            if(issuer is null)
             {
                 throw new NotCARootConfiguredThumbprintException();
             }
 
-            if(!CARoot?.HasPrivateKey ?? false)
+            if(!issuer.HasPrivateKey)
             {
                 throw new CARootWithouthPrivateKeyException();
             }
 
+            var request = new CertificateGenerationRequest
+            {
+                CommonName = commonName,
+                Organization = company,
+                Solution = "Legacy",
+                PfxPassword = "Legacy",
+                DnsNames = BuildLegacyDnsNames(serverAddress, serverDNS),
+                IpAddresses = BuildLegacyIpAddresses(serverAddress),
+                KeyUsages = ["DigitalSignature"],
+                EnhancedKeyUsages = SplitOidList(oid),
+                ValidFromUtc = DateTimeOffset.UtcNow,
+                ValidToUtc = expiring
+            };
+
+            return CreateCertificate(request, privateKey, issuer, isCertificateAuthority, friendlyName);
+        }
+
+        private X509Certificate2? CreateCertificate(CertificateGenerationRequest request, ECDsa privateKey, X509Certificate2 issuer, bool isCertificateAuthority, string? friendlyName = "")
+        {
             // Parse OID string - can contain multiple OIDs separated by comma, semicolon, or space
             var oidCollection = new OidCollection();
-            
-            if (!string.IsNullOrEmpty(oid))
+
+            foreach (var oidStr in request.EnhancedKeyUsages.Where(x => !string.IsNullOrWhiteSpace(x)))
             {
-                var oids = oid.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var oidStr in oids)
+                try
                 {
-                    try
-                    {
-                        var trimmedOid = oidStr.Trim();
-                        oidCollection.Add(new Oid(trimmedOid));
-                    }
-                    catch
-                    {
-                        // Skip invalid OIDs
-                        Logger?.Warning($"Invalid OID: {oidStr}");
-                    }
+                    var trimmedOid = oidStr.Trim();
+                    oidCollection.Add(new Oid(trimmedOid));
+                }
+                catch
+                {
+                    // Skip invalid OIDs
+                    Logger?.Warning($"Invalid OID: {oidStr}");
                 }
             }
-            
+
             // If no valid OIDs were added, return null
-            if (oidCollection.Count == 0)
+            if (oidCollection.Count == 0 && !isCertificateAuthority)
             {
                 Logger?.Warning("No valid OIDs provided");
                 return null;
             }
 
+            if(request.ValidToUtc > issuer.NotAfter)
+            {
+                throw new ArgumentException("Certificate validity cannot exceed issuer validity.");
+            }
 
-            var subject = new X500DistinguishedName(
-                $"CN={commonName}, O={company}, L=Pisa, S=PI, C=IT");
+            var subject = CreateSubject(request);
 
             var serverRequest = new CertificateRequest(
                 subject,
                 privateKey,
-                HashAlgorithmName.SHA384);
+                ResolveHashAlgorithm(request.SignatureHashAlgorithm));
 
             // Aggiungi le estensioni necessarie per un certificato server
-            serverRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
-            serverRequest.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
-            serverRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(oidCollection, false));
+            serverRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(isCertificateAuthority, isCertificateAuthority, 0, true));
+            serverRequest.CertificateExtensions.Add(new X509KeyUsageExtension(ResolveKeyUsages(request.KeyUsages), true));
+            if(!isCertificateAuthority)
+            {
+                serverRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(oidCollection, false));
+            }
             //var sanBuilder = new SubjectAlternativeNameBuilder();
 
             var san = new SubjectAlternativeNameBuilder();
+            var hasSubjectAlternativeName = false;
 
-            List<string>? listOfDnss = serverDNS.ToList();
-
-            IPAddress address = IPAddress.None;
-
-            if(IsLocalHost(serverAddress))
+            foreach(var ipAddress in request.IpAddresses.Where(x => !string.IsNullOrWhiteSpace(x)))
             {
-                IPAddress[] localhostAddresses = Dns.GetHostAddresses(serverAddress);
-
-                foreach(var addres in localhostAddresses)
+                if(IPAddress.TryParse(ipAddress, out var parsedAddress))
                 {
-                    if(addres.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                    {
-                        address = addres;
-                        break;
-                    }
+                    san.AddIpAddress(parsedAddress);
+                    hasSubjectAlternativeName = true;
                 }
-                listOfDnss.Add(serverAddress);
-            }
-            else
-            {
-                address = ManageServerAddress(serverAddress);
             }
 
-            san.AddIpAddress(ipAddress: address);
-
-            foreach(var serverN in listOfDnss ?? new List<string>())
+            foreach(var serverN in request.DnsNames.Where(x => !string.IsNullOrWhiteSpace(x)))
             {
                 san.AddDnsName(serverN);
+                hasSubjectAlternativeName = true;
             }
 
-            san.Build();
-
-            //if(withDNS && DNSs is not null)
-            //{
-            //    sanBuilder.AddDnsName("mioserver.local");
-            //    sanBuilder.AddDnsName("localhost");
-            //}
-
-            serverRequest.CertificateExtensions.Add(san.Build());
+            if(hasSubjectAlternativeName)
+            {
+                serverRequest.CertificateExtensions.Add(san.Build());
+            }
 
             byte[] serialNumber = BitConverter.GetBytes(++LastSerialNumber);
 
-            if(CARoot is not null)
+            try
             {
-                try
-                {
-                    var cert = serverRequest.Create(CARoot, DateTimeOffset.Now, CARoot.NotAfter, serialNumber);
-                    cert.FriendlyName = friendlyName;
-                    return cert;
-                }
-                catch(Exception ex)
-                {
-                    Logger?.Error($"NO CA Root well configured: {ex.Message}");
-                    throw new CARootNotFoundException();
-                }
-                finally
-                {
-
-                }
+                var cert = serverRequest.Create(issuer, request.ValidFromUtc, request.ValidToUtc, serialNumber);
+                cert.FriendlyName = friendlyName;
+                return cert;
             }
-            else
+            catch(Exception ex)
             {
-                Logger?.Warning("NO CA Root well configured");
+                Logger?.Error($"NO CA Root well configured: {ex.Message}");
                 throw new CARootNotFoundException();
             }
+        }
+
+        private static X500DistinguishedName CreateSubject(CertificateGenerationRequest request)
+        {
+            var parts = new List<string>
+            {
+                $"CN={EscapeDistinguishedNameValue(request.CommonName!)}",
+                $"O={EscapeDistinguishedNameValue(request.Organization!)}"
+            };
+
+            AddSubjectPart(parts, "OU", request.OrganizationalUnit);
+            AddSubjectPart(parts, "L", request.Locality);
+            AddSubjectPart(parts, "S", request.State);
+            AddSubjectPart(parts, "C", request.Country);
+
+            return new X500DistinguishedName(string.Join(", ", parts));
+        }
+
+        private static void AddSubjectPart(List<string> parts, string key, string? value)
+        {
+            if(!string.IsNullOrWhiteSpace(value))
+            {
+                parts.Add($"{key}={EscapeDistinguishedNameValue(value)}");
+            }
+        }
+
+        private static string EscapeDistinguishedNameValue(string value)
+        {
+            return value.Trim()
+                .Replace("\\", "\\\\")
+                .Replace(",", "\\,")
+                .Replace("+", "\\+")
+                .Replace("\"", "\\\"")
+                .Replace("<", "\\<")
+                .Replace(">", "\\>")
+                .Replace(";", "\\;");
+        }
+
+        private static HashAlgorithmName ResolveHashAlgorithm(string? algorithm)
+        {
+            return algorithm?.Trim().ToUpperInvariant() switch
+            {
+                "SHA256" => HashAlgorithmName.SHA256,
+                "SHA384" => HashAlgorithmName.SHA384,
+                "SHA512" => HashAlgorithmName.SHA512,
+                _ => HashAlgorithmName.SHA384
+            };
+        }
+
+        private static X509KeyUsageFlags ResolveKeyUsages(IEnumerable<string> keyUsages)
+        {
+            var flags = X509KeyUsageFlags.None;
+
+            foreach(var keyUsage in keyUsages.Where(x => !string.IsNullOrWhiteSpace(x)))
+            {
+                flags |= keyUsage.Trim().ToUpperInvariant() switch
+                {
+                    "DIGITALSIGNATURE" => X509KeyUsageFlags.DigitalSignature,
+                    "NONREPUDIATION" => X509KeyUsageFlags.NonRepudiation,
+                    "KEYENCIPHERMENT" => X509KeyUsageFlags.KeyEncipherment,
+                    "DATAENCIPHERMENT" => X509KeyUsageFlags.DataEncipherment,
+                    "KEYAGREEMENT" => X509KeyUsageFlags.KeyAgreement,
+                    "KEYCERTSIGN" => X509KeyUsageFlags.KeyCertSign,
+                    "CRLSIGN" => X509KeyUsageFlags.CrlSign,
+                    _ => X509KeyUsageFlags.None
+                };
+            }
+
+            return flags == X509KeyUsageFlags.None ? X509KeyUsageFlags.DigitalSignature : flags;
+        }
+
+        private static string[] SplitOidList(string? oid)
+        {
+            return string.IsNullOrWhiteSpace(oid)
+                ? []
+                : oid.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+
+        private static string? TryParseIpAddress(string? value)
+        {
+            return IPAddress.TryParse(value, out var ipAddress) ? ipAddress.ToString() : null;
+        }
+
+        private static string[] BuildLegacyDnsNames(string? serverAddress, string[]? serverDNS)
+        {
+            var dnsNames = new List<string>(serverDNS ?? []);
+
+            if(!string.IsNullOrWhiteSpace(serverAddress) && !IPAddress.TryParse(serverAddress, out _))
+            {
+                dnsNames.Add(serverAddress);
+            }
+
+            return dnsNames.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
+        private static string[] BuildLegacyIpAddresses(string? serverAddress)
+        {
+            if(IPAddress.TryParse(serverAddress, out var ipAddress))
+            {
+                return [ipAddress.ToString()];
+            }
+
+            if(string.Equals(serverAddress, "localhost", StringComparison.OrdinalIgnoreCase))
+            {
+                return [IPAddress.Loopback.ToString()];
+            }
+
+            return [];
+        }
+
+        private static string? GetPrimaryEndpoint(CertificateGenerationRequest request)
+        {
+            return request.IpAddresses.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
+                ?? request.DnsNames.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
         }
 
         public X509Certificate2? Get(string? textToSearch, X509FindType type, StoreName storeName, StoreLocation storeLocation)
@@ -582,6 +747,129 @@ namespace CertificateCommon
             }
 
             return null;
+        }
+
+        public X509Certificate2? ResolveCertificateAuthority(string? thumbprint)
+        {
+            if(string.IsNullOrWhiteSpace(thumbprint))
+            {
+                throw new NotCARootConfiguredThumbprintException();
+            }
+
+            var normalizedThumbprint = NormalizeThumbprint(thumbprint);
+            var candidates = new List<X509Certificate2>();
+
+            Logger?.Information("Resolving CA root thumbprint {Thumbprint} across {StoreCount} configured certificate stores.",
+                normalizedThumbprint,
+                CertificateAuthorityStores.Count);
+
+            foreach(var storeToSearch in CertificateAuthorityStores)
+            {
+                var foundCertificates = GetCollection(
+                    normalizedThumbprint,
+                    X509FindType.FindByThumbprint,
+                    storeToSearch.StoreName,
+                    storeToSearch.StoreLocation);
+
+                Logger?.Information("Searched CA root in {StoreLocation}/{StoreName}. Matches={Count}.",
+                    storeToSearch.StoreLocation,
+                    storeToSearch.StoreName,
+                    foundCertificates.Count);
+
+                foreach(var certificate in foundCertificates)
+                {
+                    candidates.Add(certificate);
+                    Logger?.Information("Found CA candidate {Thumbprint} in {StoreLocation}/{StoreName}. HasPrivateKey={HasPrivateKey}",
+                        certificate.Thumbprint,
+                        storeToSearch.StoreLocation,
+                        storeToSearch.StoreName,
+                        certificate.HasPrivateKey);
+                }
+            }
+
+            var candidatesWithPrivateKey = candidates
+                .Where(certificate => certificate.HasPrivateKey)
+                .GroupBy(certificate => NormalizeThumbprint(certificate.Thumbprint))
+                .Select(group => group.First())
+                .ToList();
+
+            if(candidatesWithPrivateKey.Count >= 1)
+            {
+                return candidatesWithPrivateKey[0];
+            }
+
+            if(candidates.Count > 1)
+            {
+                Logger?.Warning("More CA certificates found for the same thumbprint, but none has a private key. Returning the first certificate found.");
+            }
+
+            return candidates.FirstOrDefault();
+        }
+
+        private static IReadOnlyList<CertificateStoreSearchLocation> ReadCertificateAuthorityStores(IConfigurationSection certificationManagerSection)
+        {
+            var configuredStores = certificationManagerSection
+                .GetSection("CARootStores")
+                .GetChildren()
+                .Select(ReadCertificateStoreSearchLocation)
+                .Where(store => store is not null)
+                .Cast<CertificateStoreSearchLocation>()
+                .ToList();
+
+            if(configuredStores.Count > 0)
+            {
+                return configuredStores;
+            }
+
+            var storeNameValue = certificationManagerSection.GetSection("CARootStoreName").Value;
+            var storeLocationValue = certificationManagerSection.GetSection("CARootStoreLocation").Value;
+            if(!string.IsNullOrWhiteSpace(storeNameValue) || !string.IsNullOrWhiteSpace(storeLocationValue))
+            {
+                return
+                [
+                    new(
+                        ParseEnumOrDefault(storeNameValue, StoreName.My),
+                        ParseEnumOrDefault(storeLocationValue, StoreLocation.CurrentUser))
+                ];
+            }
+
+            return DefaultCertificateAuthorityStores;
+        }
+
+        private static CertificateStoreSearchLocation? ReadCertificateStoreSearchLocation(IConfigurationSection section)
+        {
+            var storeNameValue = section.GetSection("StoreName").Value;
+            var storeLocationValue = section.GetSection("StoreLocation").Value;
+
+            if(string.IsNullOrWhiteSpace(storeNameValue) && string.IsNullOrWhiteSpace(storeLocationValue))
+            {
+                return null;
+            }
+
+            return new CertificateStoreSearchLocation(
+                ParseEnumOrDefault(storeNameValue, StoreName.My),
+                ParseEnumOrDefault(storeLocationValue, StoreLocation.CurrentUser));
+        }
+
+        private static TEnum ParseEnumOrDefault<TEnum>(string? value, TEnum defaultValue)
+            where TEnum : struct, Enum
+        {
+            return Enum.TryParse<TEnum>(value, ignoreCase: true, out var parsedValue)
+                ? parsedValue
+                : defaultValue;
+        }
+
+        private static string NormalizeThumbprint(string? thumbprint)
+        {
+            if(string.IsNullOrWhiteSpace(thumbprint))
+            {
+                return string.Empty;
+            }
+
+            return new string(thumbprint
+                .Where(Uri.IsHexDigit)
+                .Select(char.ToUpperInvariant)
+                .ToArray());
         }
 
         /// <summary>

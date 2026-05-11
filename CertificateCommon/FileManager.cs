@@ -132,15 +132,25 @@ namespace CertificateManager.src
         public int? Id { get; init; }
         public string? Company { get; init; }
         public string? CN { get; init; }
+        public string? OrganizationalUnit { get; init; }
+        public string? Locality { get; init; }
+        public string? State { get; init; }
+        public string? Country { get; init; }
         public string? Solution { get; init; }
         public string? Name { get; init; } // Human-friendly name for certificate organization
         public string? PFXCertificate { get; init; }
         public string? CRTCertificate { get; init; }
         public DateTime Creation { get; init; } = DateTime.Now;
+        public DateTimeOffset? ValidFromUtc { get; init; }
+        public DateTimeOffset? ValidToUtc { get; init; }
         public string? RootThumbPrint { get; set; } = string.Empty;
         public string? Address { get; init; }
         public string[]? DNS { get; init; }
+        public string[]? IpAddresses { get; init; }
         public string? Oid { get; init; }
+        public string[]? KeyUsages { get; init; }
+        public string? KeyAlgorithm { get; init; }
+        public string? SignatureHashAlgorithm { get; init; }
     }
 
     public class CertificateComplete: Certificate
@@ -173,18 +183,35 @@ namespace CertificateManager.src
         public ShaManager ShaManager => _shaManager;
         private ShaManager _shaManager { get; init; }
         public FileManagerCertificate(string jsonAddress, Serilog.ILogger? logger, ShaManager shamanager)
+            : this([jsonAddress], logger, shamanager)
+        {
+        }
+
+        public FileManagerCertificate(IEnumerable<string> jsonAddresses, Serilog.ILogger? logger, ShaManager shamanager)
         {
             _logger = logger;
             _shaManager = shamanager;
 
-            _dbCertificates = jsonAddress;
-            if(File.Exists(jsonAddress))
+            var databasePaths = jsonAddresses
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            _dbCertificates = databasePaths.FirstOrDefault();
+            _lastJSonMemory = new CertificateDB();
+
+            if(!string.IsNullOrWhiteSpace(_dbCertificates))
             {
-                Load();
+                var databaseDirectory = Path.GetDirectoryName(_dbCertificates);
+                if(!string.IsNullOrWhiteSpace(databaseDirectory))
+                {
+                    Directory.CreateDirectory(databaseDirectory);
+                }
             }
-            else
+
+            foreach(var databasePath in databasePaths)
             {
-                _lastJSonMemory = new CertificateDB();
+                Load(databasePath);
             }
         }
 
@@ -277,7 +304,12 @@ namespace CertificateManager.src
 
         public void Load()
         {
-            if(!File.Exists(_dbCertificates))
+            Load(_dbCertificates);
+        }
+
+        private void Load(string? databasePath)
+        {
+            if(string.IsNullOrWhiteSpace(databasePath) || !File.Exists(databasePath))
             {
                 _logger?.Information("No db data to load");
                 return;
@@ -286,21 +318,22 @@ namespace CertificateManager.src
             _lock.EnterWriteLock();
             try
             {
-                var jsonString = File.ReadAllText(_dbCertificates);
-                _lastJSonMemory = JsonSerializer.Deserialize<CertificateDB>(jsonString, _options);
+                var jsonString = File.ReadAllText(databasePath);
+                var loadedMemory = JsonSerializer.Deserialize<CertificateDB>(jsonString, _options);
 
-                foreach(var cert in _lastJSonMemory?.CertificatesDB ?? new List<Certificate>())
+                foreach(var cert in loadedMemory?.CertificatesDB ?? new List<Certificate>())
                 {
                     if(cert is CertificateComplete certCom)
                     {
                         certCom.LoadCertificate();
                     }
 
+                    AddLoadedCertificate(cert);
                 }
             }
             catch(Exception ex)
             {
-                _logger?.Warning($"Impossibile to load {_dbCertificates} -> {ex.Message}");
+                _logger?.Warning($"Impossibile to load {databasePath} -> {ex.Message}");
             }
             finally
             {
@@ -309,7 +342,80 @@ namespace CertificateManager.src
 
         }
 
-        public void Add(string pfxFile, string oid, string company, string commonName, string crtRoot, string solution, string? name, string password, string rootThumbprint, string address, string[] dns)
+        private void AddLoadedCertificate(Certificate certificate)
+        {
+            if(_lastJSonMemory is null)
+            {
+                _lastJSonMemory = new CertificateDB();
+            }
+
+            var alreadyLoaded = _lastJSonMemory.CertificatesDB.Any(existing =>
+                string.Equals(existing.Solution, certificate.Solution, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.Name, certificate.Name, StringComparison.OrdinalIgnoreCase));
+
+            if(!alreadyLoaded)
+            {
+                if(_lastJSonMemory.CertificatesDB.Any(existing => existing.Id == certificate.Id))
+                {
+                    certificate = CloneCertificate(certificate, (_lastJSonMemory.MaxId ?? 0) + 1);
+                }
+
+                _lastJSonMemory.CertificatesDB.Add(certificate);
+            }
+        }
+
+        private static Certificate CloneCertificate(Certificate source, int id)
+        {
+            return new CertificateComplete
+            {
+                CRTCertificate = source.CRTCertificate,
+                PFXCertificate = source.PFXCertificate,
+                CN = source.CN,
+                Company = source.Company,
+                OrganizationalUnit = source.OrganizationalUnit,
+                Locality = source.Locality,
+                State = source.State,
+                Country = source.Country,
+                Solution = source.Solution,
+                Name = source.Name,
+                Password = source.Password,
+                Id = id,
+                RootThumbPrint = source.RootThumbPrint,
+                Address = source.Address,
+                DNS = source.DNS,
+                IpAddresses = source.IpAddresses,
+                Oid = source.Oid,
+                KeyUsages = source.KeyUsages,
+                Creation = source.Creation,
+                ValidFromUtc = source.ValidFromUtc,
+                ValidToUtc = source.ValidToUtc,
+                KeyAlgorithm = source.KeyAlgorithm,
+                SignatureHashAlgorithm = source.SignatureHashAlgorithm
+            };
+        }
+
+        public void Add(
+            string pfxFile,
+            string oid,
+            string company,
+            string commonName,
+            string crtRoot,
+            string solution,
+            string? name,
+            string password,
+            string rootThumbprint,
+            string? address,
+            string[] dns,
+            string[] ipAddresses,
+            string? organizationalUnit,
+            string? locality,
+            string? state,
+            string? country,
+            DateTimeOffset validFromUtc,
+            DateTimeOffset validToUtc,
+            string[] keyUsages,
+            string keyAlgorithm,
+            string signatureHashAlgorithm)
         {
             _lock.EnterWriteLock();
             try
@@ -320,6 +426,10 @@ namespace CertificateManager.src
                     PFXCertificate = pfxFile,
                     CN = commonName,
                     Company = company,
+                    OrganizationalUnit = organizationalUnit,
+                    Locality = locality,
+                    State = state,
+                    Country = country,
                     Solution = solution,
                     Name = name,
                     Password = password,
@@ -327,7 +437,13 @@ namespace CertificateManager.src
                     RootThumbPrint = rootThumbprint,
                     Address = address,
                     DNS = dns,
-                    Oid = oid
+                    IpAddresses = ipAddresses,
+                    Oid = oid,
+                    KeyUsages = keyUsages,
+                    ValidFromUtc = validFromUtc,
+                    ValidToUtc = validToUtc,
+                    KeyAlgorithm = keyAlgorithm,
+                    SignatureHashAlgorithm = signatureHashAlgorithm
                 };
 
                 crt.LoadCertificate();
