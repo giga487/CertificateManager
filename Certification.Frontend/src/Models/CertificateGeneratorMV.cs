@@ -114,7 +114,7 @@ namespace CertificateManager.Client.src.Models
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadPFX?id={id}", runtime: _jsRuntime, prefix: found.Solution);
+                    await _factory?.Download($"api/Certificate/downloadPFX?id={id}", runtime: _jsRuntime, prefix: found.Solution, fallbackFileName: "Certificate.pfx");
                 }
 
 

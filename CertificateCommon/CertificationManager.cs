@@ -750,7 +750,8 @@ namespace CertificateCommon
 
             try
             {
-                var cert = serverRequest.Create(issuer, request.ValidFromUtc, request.ValidToUtc, serialNumber);
+                var signatureGenerator = CreateIssuerSignatureGenerator(issuer);
+                var cert = serverRequest.Create(issuer.SubjectName, signatureGenerator, request.ValidFromUtc, request.ValidToUtc, serialNumber);
                 cert.FriendlyName = friendlyName;
                 return cert;
             }
@@ -829,6 +830,23 @@ namespace CertificateCommon
                 RSA rsa => new CertificateRequest(subject, rsa, hashAlgorithm, RSASignaturePadding.Pkcs1),
                 _ => throw new ArgumentException("Unsupported private key algorithm.", nameof(privateKey))
             };
+        }
+
+        private static X509SignatureGenerator CreateIssuerSignatureGenerator(X509Certificate2 issuer)
+        {
+            var issuerEcdsaKey = issuer.GetECDsaPrivateKey();
+            if(issuerEcdsaKey is not null)
+            {
+                return X509SignatureGenerator.CreateForECDsa(issuerEcdsaKey);
+            }
+
+            var issuerRsaKey = issuer.GetRSAPrivateKey();
+            if(issuerRsaKey is not null)
+            {
+                return X509SignatureGenerator.CreateForRSA(issuerRsaKey, RSASignaturePadding.Pkcs1);
+            }
+
+            throw new CARootWithouthPrivateKeyException();
         }
 
         private static X509Certificate2 CopyWithPrivateKey(X509Certificate2 certificate, AsymmetricAlgorithm privateKey)

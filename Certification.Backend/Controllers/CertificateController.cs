@@ -131,7 +131,7 @@ namespace Certification.Backend.Controllers
 					return BadRequest("Failed to generate PFX. The result was empty. Check if the private key matches the certificate.");
 				}
 
-				return File(certificateData, "application/x-x509-ca-cert", "Certificate.pfx");
+				return File(certificateData, "application/x-pkcs12", "Certificate.pfx");
 			}
 			catch(Exception ex)
 			{
@@ -155,7 +155,7 @@ namespace Certification.Backend.Controllers
 			file.Position = 0;
 			Logger?.Warning($"Sha {filePath}: {sha}");
 
-			return File(file, "application/octet-stream", "Certificate.pfx");
+			return File(file, "application/x-pkcs12", "Certificate.pfx");
 		}
 
 		[HttpGet("downloadCRT")]

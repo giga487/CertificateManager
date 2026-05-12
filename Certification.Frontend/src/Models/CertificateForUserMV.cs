@@ -81,7 +81,7 @@ namespace CertificateManager.Client.src.Models
 
             try
             {
-                await _factory?.Download($"api/Certificate/downloadPFX?id={id}", runtime: _jsRuntime, prefix: solution);
+                await _factory?.Download($"api/Certificate/downloadPFX?id={id}", runtime: _jsRuntime, prefix: solution, fallbackFileName: "Certificate.pfx");
 
             }
             catch(OperationCanceledException ex)
