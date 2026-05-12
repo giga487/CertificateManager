@@ -19,28 +19,31 @@ else if (ViewModel?.Certificates?.CertificatesDB != null && ViewModel.Certificat
         .ThenByDescending(c => c.Creation)
         .AsQueryable();
 
-    <FluentDataGrid Items="@certificates">
-        <PropertyColumn Property="@(p => p.Id)" Sortable="true" Width="5%" />
-        <PropertyColumn Property="@(p => p.Creation)" Sortable="true" Width="15%" />
+    <FluentDataGrid Items="@certificates" GridTemplateColumns="4rem 10rem minmax(10rem, 1fr) minmax(14rem, 1.4fr) 8rem minmax(12rem, 1fr) 7rem minmax(10rem, 1fr) 9rem 7rem 6.5rem 6.5rem 6.5rem 7rem">
+        <PropertyColumn Property="@(p => p.Id)" Sortable="true" />
+        <PropertyColumn Property="@(p => p.Creation)" Sortable="true" />
         <PropertyColumn Property="@(p => p.Solution)" Sortable="true" Title="Solution" />
         <PropertyColumn Property="@(p => p.Name)" Sortable="true" Title="Name" />
         <PropertyColumn Property="@(p => p.KeyAlgorithm)" Sortable="true" Title="Algorithm" />
         <PropertyColumn Property="@(p => p.ApplicationUri)" Sortable="true" Title="Application URI" />
-        <PropertyColumn Property="@(p => p.Password)" Width="10%" />
+        <PropertyColumn Property="@(p => p.Password)" />
         <TemplateColumn Title="DNS">
             @(context.DNS is null ? string.Empty : string.Join(", ", context.DNS))
         </TemplateColumn>
-        <PropertyColumn Property="@(p => p.Address)" Width="10%" />
-        <TemplateColumn Title="PFX" Width="8%">
+        <PropertyColumn Property="@(p => p.Address)" />
+        <TemplateColumn Title="Store Thumbprint">
+            <FluentButton Color="Color.Accent" OnClick="(() => ShowThumbprint(context.RootThumbPrint))">Show</FluentButton>
+        </TemplateColumn>
+        <TemplateColumn Title="PFX">
             <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(context.Id))">Download</FluentButton>
         </TemplateColumn>
-        <TemplateColumn Title="CA Root" Width="8%">
+        <TemplateColumn Title="CA Root">
             <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
         </TemplateColumn>
-        <TemplateColumn Title="DER" Width="8%">
+        <TemplateColumn Title="DER">
             <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(context.Id))">Download</FluentButton>
         </TemplateColumn>
-        <TemplateColumn Title="Regenerate" Width="8%">
+        <TemplateColumn Title="Regenerate">
             <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(context.Id))">Modify</FluentButton>
         </TemplateColumn>
     </FluentDataGrid>
@@ -59,6 +62,15 @@ else
     {
         // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
         base.OnInitializedAsync();
+    }
+
+    private async Task ShowThumbprint(string? thumbprint)
+    {
+        var message = string.IsNullOrWhiteSpace(thumbprint)
+            ? "Thumbprint not available."
+            : thumbprint;
+
+        await JSRuntime.InvokeVoidAsync("showAlert", message);
     }
 
 }

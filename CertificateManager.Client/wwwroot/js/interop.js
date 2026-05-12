@@ -3,9 +3,9 @@
 };
 
 // 👇 Aggiungi la nuova funzione qui sotto 👇
-window.downloadFileFromStream = async (fileName, contentStreamReference) => {
+window.downloadFileFromStream = async (fileName, contentStreamReference, contentType) => {
     const arrayBuffer = await contentStreamReference.arrayBuffer();
-    const blob = new Blob([arrayBuffer]);
+    const blob = new Blob([arrayBuffer], { type: contentType ?? 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const anchorElement = document.createElement('a');
     anchorElement.href = url;

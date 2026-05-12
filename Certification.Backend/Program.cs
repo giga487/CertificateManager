@@ -3,6 +3,8 @@ using CertificateCommon;
 using CertificateManager.src;
 using Certification.Backend.Services;
 using Common;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.FileProviders;
 using Serilog;
 using Serilog.Events;
 
@@ -72,11 +74,35 @@ namespace Certification.Backend
 
 			app.UseCors("Frontend");
 			app.UseHttpsRedirection();
+			app.UseFileServer(new FileServerOptions
+			{
+				FileProvider = new PhysicalFileProvider(Path.GetFullPath(outputOptions.PrimaryOutput, app.Environment.ContentRootPath)),
+				RequestPath = "/output",
+				EnableDirectoryBrowsing = true,
+				StaticFileOptions =
+				{
+					ContentTypeProvider = BuildCertificateContentTypeProvider()
+				}
+			});
 			app.UseAuthorization();
 
 			app.MapControllers();
 
 			app.Run();
+		}
+
+		private static FileExtensionContentTypeProvider BuildCertificateContentTypeProvider()
+		{
+			var provider = new FileExtensionContentTypeProvider();
+			provider.Mappings[".pfx"] = "application/x-pkcs12";
+			provider.Mappings[".p12"] = "application/x-pkcs12";
+			provider.Mappings[".crt"] = "application/x-x509-ca-cert";
+			provider.Mappings[".cer"] = "application/pkix-cert";
+			provider.Mappings[".der"] = "application/pkix-cert";
+			provider.Mappings[".key"] = "application/x-pem-file";
+			provider.Mappings[".pem"] = "application/x-pem-file";
+
+			return provider;
 		}
 	}
 }

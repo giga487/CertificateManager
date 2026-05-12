@@ -18,7 +18,14 @@
         <FluentTextArea Rows="1" @bind-Value=Name>Name (optional)</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=CommonName>Common Name</FluentTextArea>
         <FluentTextArea Rows="1" @bind-Value=Company>Organization</FluentTextArea>
-        <FluentTextArea Rows="1" @bind-Value=Password>Password</FluentTextArea>
+    </FluentStack>
+
+    <FluentStack Orientation="Orientation.Vertical">
+        <FluentCheckbox @bind-Value=UsePfxPassword>Protect PFX with password</FluentCheckbox>
+        @if(UsePfxPassword)
+        {
+            <FluentTextArea Rows="1" @bind-Value=Password>PFX Password</FluentTextArea>
+        }
     </FluentStack>
 
     <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
@@ -183,6 +190,7 @@
     string Country { get; set; } = "IT";
     string CommonName { get; set; } = "server";
     string Password { get; set; } = "secret";
+    bool UsePfxPassword { get; set; } = true;
     string ApplicationUri { get; set; } = "urn:localhost:NXT:server";
     DateTime? ValidFrom { get; set; } = DateTime.UtcNow.Date;
     DateTime? ValidTo { get; set; } = DateTime.UtcNow.Date.AddYears(10);
@@ -728,6 +736,7 @@
             Solution = cert.Solution ?? "";
             Name = cert.Name ?? "";
             Password = cert.Password ?? "";
+            UsePfxPassword = !string.IsNullOrWhiteSpace(Password);
             CommonName = cert.CN ?? "";
             Company = cert.Company ?? "";
             ApplicationUri = cert.ApplicationUri ?? "";
@@ -787,7 +796,7 @@
             Locality = Locality,
             State = State,
             Country = Country,
-            PfxPassword = Password,
+            PfxPassword = UsePfxPassword ? Password : string.Empty,
             ApplicationUri = ApplicationUri,
             DnsNames = DNSStrings.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray(),
             IpAddresses = IPStrings.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray(),

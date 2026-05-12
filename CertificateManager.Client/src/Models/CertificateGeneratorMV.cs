@@ -114,7 +114,7 @@ namespace CertificateManager.Client.src.Models
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadPFX?id={id}", runtime: _jsRuntime, prefix: found.Solution);
+                    await _factory?.Download($"api/Certificate/downloadPFX?id={id}", runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: "Certificate.pfx");
                 }
 
 
@@ -138,7 +138,7 @@ namespace CertificateManager.Client.src.Models
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime, prefix: found.Solution);
+                    await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: "FCNXTCA.crt");
                 }
             }
             catch(OperationCanceledException ex)
@@ -154,13 +154,20 @@ namespace CertificateManager.Client.src.Models
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadDER?id={id}", runtime: _jsRuntime, prefix: found.Solution);
+                    await _factory?.Download($"api/Certificate/downloadDER?id={id}", runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: "Certificate.der");
                 }
             }
             catch(OperationCanceledException ex)
             {
 
             }
+        }
+
+        private static string GetDownloadPrefix(Certificate? found)
+        {
+            return string.IsNullOrWhiteSpace(found?.Solution)
+                ? string.Empty
+                : $"{found.Solution}-";
         }
     }
 }

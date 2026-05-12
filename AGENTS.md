@@ -1,5 +1,16 @@
 # Codex Instructions
 
+## AI Development Pipeline
+
+Use the most capable AI model as the main orchestrator for non-trivial work.
+It should first analyze the user's prompt, identify the real goal, split the work into
+small independent tasks, and assign those tasks to simpler subagents when parallel
+execution can reduce context usage, token usage, or turnaround time.
+
+The orchestrator remains responsible for the final result: it should integrate the
+subagents' findings or changes, resolve conflicts, verify the outcome, and keep edits
+scoped to the requested work.
+
 ## Verification Pipeline
 
 Do not start long-running application processes unless the user explicitly asks for it.

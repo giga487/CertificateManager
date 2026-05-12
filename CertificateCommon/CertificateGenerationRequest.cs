@@ -41,7 +41,6 @@ namespace CertificateManager.src
             RequireText(Solution, nameof(Solution), errors);
             RequireText(CommonName, nameof(CommonName), errors);
             RequireText(Organization, nameof(Organization), errors);
-            RequireText(PfxPassword, nameof(PfxPassword), errors);
             ValidatePathSegment(Solution, nameof(Solution), errors);
             ValidatePathSegment(Name, nameof(Name), errors);
 

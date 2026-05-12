@@ -483,12 +483,13 @@ namespace CertificateCommon
             }
 
             var serverPfx = CopyWithPrivateKey(x509Son!, serverKey);
-            if(!string.IsNullOrEmpty(request.PfxPassword) && serverPfx is not null)
+            if(serverPfx is not null)
             {
                 try
                 {
+                    var pfxPassword = request.PfxPassword ?? string.Empty;
                     string pfxFileName = Path.Join(path, pfxName);
-                    File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, request.PfxPassword));
+                    File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, pfxPassword));
                     fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son, resolvedKeyAlgorithm.ToString(), request.ApplicationUri));
 
                     string certFileName = Path.Join(path, certName);
@@ -516,7 +517,7 @@ namespace CertificateCommon
 
                     FileManager?.Add(commonName: request.CommonName!, company: request.Organization!, oid: string.Join(",", request.EnhancedKeyUsages),
                         pfxFile: pfxFileName, crtRoot: certFileNameRoot, derFile: derFileName, solution: request.Solution!,
-                        name: request.Name, password: request.PfxPassword!, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), applicationUri: request.ApplicationUri, dns: request.DnsNames,
+                        name: request.Name, password: pfxPassword, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), applicationUri: request.ApplicationUri, dns: request.DnsNames,
                         ipAddresses: request.IpAddresses, organizationalUnit: request.OrganizationalUnit, locality: request.Locality, state: request.State,
                         country: request.Country, validFromUtc: request.ValidFromUtc, validToUtc: request.ValidToUtc, keyUsages: request.KeyUsages, keyAlgorithm: resolvedKeyAlgorithm.ToString(),
                         signatureHashAlgorithm: request.SignatureHashAlgorithm);

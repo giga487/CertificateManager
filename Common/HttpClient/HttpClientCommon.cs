@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -36,7 +37,7 @@ namespace CommonBlazor.HttpClient
             return _httpFactory?.CreateClient(ClientName) ?? null;
         }
 
-        public async Task Download(string address, IJSRuntime runtime, string prefix)
+        public async Task Download(string address, IJSRuntime runtime, string prefix, string fallbackFileName = "downloaded_file")
         {
 
         //< script >
@@ -53,11 +54,11 @@ namespace CommonBlazor.HttpClient
         //    };
         //</ script >
 
-            await GetStreamAsync(address, runtime, prefix);
+            await GetStreamAsync(address, runtime, prefix, fallbackFileName);
         }
 
 
-        public async Task GetStreamAsync(string address, IJSRuntime runtime, string beforeName = "")
+        public async Task GetStreamAsync(string address, IJSRuntime runtime, string beforeName = "", string fallbackFileName = "downloaded_file")
         {
             var client = _httpFactory?.CreateClient(ClientName);
 
@@ -86,7 +87,8 @@ namespace CommonBlazor.HttpClient
                         //await runtime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
 
 
-                        var fileName = beforeName + response.Content.Headers.ContentDisposition?.FileNameStar ?? "downloaded_file";
+                        var fileName = BuildDownloadFileName(response.Content.Headers.ContentDisposition, beforeName, fallbackFileName);
+                        var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
 
                         // 1. Leggi lo stream dalla risposta UNA SOLA VOLTA
                         using var networkStream = await response.Content.ReadAsStreamAsync();
@@ -106,7 +108,7 @@ namespace CommonBlazor.HttpClient
 
                         // 5. Usa lo STESSO MemoryStream per il download
                         using var streamRef = new DotNetStreamReference(stream: memoryStream);
-                        await runtime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef);
+                        await runtime.InvokeVoidAsync("downloadFileFromStream", fileName, streamRef, contentType);
                     }
                 }
                 catch(Exception ex)
@@ -116,6 +118,23 @@ namespace CommonBlazor.HttpClient
             }
 
             return;
+        }
+
+        private static string BuildDownloadFileName(ContentDispositionHeaderValue? contentDisposition, string prefix, string fallbackFileName)
+        {
+            var responseFileName = contentDisposition?.FileNameStar;
+            if(string.IsNullOrWhiteSpace(responseFileName))
+            {
+                responseFileName = contentDisposition?.FileName;
+            }
+
+            responseFileName = responseFileName?.Trim().Trim('"');
+            if(string.IsNullOrWhiteSpace(responseFileName))
+            {
+                responseFileName = fallbackFileName;
+            }
+
+            return $"{prefix}{responseFileName}";
         }
 
 

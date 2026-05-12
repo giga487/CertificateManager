@@ -15,7 +15,6 @@ namespace UT
             Assert.IsTrue(errors.Contains("Solution is required."));
             Assert.IsTrue(errors.Contains("CommonName is required."));
             Assert.IsTrue(errors.Contains("Organization is required."));
-            Assert.IsTrue(errors.Contains("PfxPassword is required."));
         }
 
         [TestMethod]
