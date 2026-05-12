@@ -105,6 +105,72 @@ namespace UT
             Assert.AreEqual(expectedCount, actualCount, "Total number of certificates mismatch after concurrent adds.");
         }
 
+        [TestMethod]
+        public void Add_ShouldKeepMultipleCertificatesInSameSolution()
+        {
+            var shaManager = new ShaManager();
+            using var fileManager = new FileManagerCertificate(_tempFile, null, shaManager);
+
+            fileManager.Add(
+                pfxFile: _tempPfxFile,
+                oid: "1.2.3",
+                company: "TestComp",
+                commonName: "CN_1",
+                crtRoot: _tempCrtFile,
+                derFile: _tempCrtFile,
+                solution: "SharedSolution",
+                name: "First",
+                password: TestCertificatePassword,
+                rootThumbprint: "thumb",
+                address: "127.0.0.1",
+                applicationUri: "urn:localhost:TestComp:First",
+                dns: ["first.local"],
+                ipAddresses: ["127.0.0.1"],
+                organizationalUnit: "Unit",
+                locality: "Pisa",
+                state: "PI",
+                country: "IT",
+                validFromUtc: DateTimeOffset.UtcNow,
+                validToUtc: DateTimeOffset.UtcNow.AddDays(1),
+                keyUsages: ["DigitalSignature"],
+                keyAlgorithm: CertificatePrivateKeyAlgorithm.EcdsaP256.ToString(),
+                signatureHashAlgorithm: "SHA384");
+
+            fileManager.Add(
+                pfxFile: _tempPfxFile,
+                oid: "1.2.3",
+                company: "TestComp",
+                commonName: "CN_2",
+                crtRoot: _tempCrtFile,
+                derFile: _tempCrtFile,
+                solution: "SharedSolution",
+                name: "Second",
+                password: TestCertificatePassword,
+                rootThumbprint: "thumb",
+                address: "127.0.0.2",
+                applicationUri: "urn:localhost:TestComp:Second",
+                dns: ["second.local"],
+                ipAddresses: ["127.0.0.2"],
+                organizationalUnit: "Unit",
+                locality: "Pisa",
+                state: "PI",
+                country: "IT",
+                validFromUtc: DateTimeOffset.UtcNow,
+                validToUtc: DateTimeOffset.UtcNow.AddDays(1),
+                keyUsages: ["DigitalSignature"],
+                keyAlgorithm: CertificatePrivateKeyAlgorithm.EcdsaP256.ToString(),
+                signatureHashAlgorithm: "SHA384");
+
+            var certificates = fileManager.JSONMemory?.CertificatesDB
+                .Where(certificate => certificate.Solution == "SharedSolution")
+                .ToList();
+
+            Assert.AreEqual(2, certificates?.Count);
+            int? latestId = null;
+            Assert.IsTrue(fileManager.JSONMemory?.GetIDBySolution("SharedSolution", out latestId) ?? false);
+            Assert.AreEqual(certificates?.Max(certificate => certificate.Id), latestId);
+        }
+
         private static void DeleteIfExists(string path)
         {
             if (!File.Exists(path))

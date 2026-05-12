@@ -1,67 +1,189 @@
-﻿@page "/certificate"
+@page "/certificate"
 @using CertificateManager.Client.src.Models
+@using CertificateManager.src
 @inject IJSRuntime JSRuntime
 
 @inherits Page<CertificateOvervieVM>
 
 <PageTitle>Certificate Generator</PageTitle>
 
-<h2>Certificates List</h2>
+<div class="certificate-overview-page">
+    <h2>Certificates</h2>
 
-@if (ViewModel?.IsLoading ?? true)
-{
-    <FluentProgressRing />
-}
-else if (ViewModel?.Certificates?.CertificatesDB != null && ViewModel.Certificates.CertificatesDB.Any())
-{
-    var certificates = ViewModel.Certificates.CertificatesDB
-        .OrderBy(c => c.Solution ?? string.Empty)
-        .ThenByDescending(c => c.Creation)
-        .AsQueryable();
+    @if (ViewModel?.IsLoading ?? true)
+    {
+        <FluentProgressRing />
+    }
+    else if (ViewModel?.Certificates?.CertificatesDB != null && ViewModel.Certificates.CertificatesDB.Any())
+    {
+        var certificates = ViewModel.Certificates.CertificatesDB
+            .OrderBy(c => c.Solution ?? string.Empty)
+            .ThenByDescending(c => c.Creation)
+            .ToList();
 
-    <FluentDataGrid Items="@certificates" GridTemplateColumns="4rem 10rem minmax(10rem, 1fr) minmax(14rem, 1.4fr) 8rem minmax(12rem, 1fr) 7rem minmax(10rem, 1fr) 9rem 7rem 6.5rem 6.5rem 6.5rem 7rem">
-        <PropertyColumn Property="@(p => p.Id)" Sortable="true" />
-        <PropertyColumn Property="@(p => p.Creation)" Sortable="true" />
-        <PropertyColumn Property="@(p => p.Solution)" Sortable="true" Title="Solution" />
-        <PropertyColumn Property="@(p => p.Name)" Sortable="true" Title="Name" />
-        <PropertyColumn Property="@(p => p.KeyAlgorithm)" Sortable="true" Title="Algorithm" />
-        <PropertyColumn Property="@(p => p.ApplicationUri)" Sortable="true" Title="Application URI" />
-        <PropertyColumn Property="@(p => p.Password)" />
-        <TemplateColumn Title="DNS">
-            @(context.DNS is null ? string.Empty : string.Join(", ", context.DNS))
-        </TemplateColumn>
-        <PropertyColumn Property="@(p => p.Address)" />
-        <TemplateColumn Title="Store Thumbprint">
-            <FluentButton Color="Color.Accent" OnClick="(() => ShowThumbprint(context.RootThumbPrint))">Show</FluentButton>
-        </TemplateColumn>
-        <TemplateColumn Title="PFX">
-            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(context.Id))">Download</FluentButton>
-        </TemplateColumn>
-        <TemplateColumn Title="CA Root">
-            <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(context.Id))">Download</FluentButton>
-        </TemplateColumn>
-        <TemplateColumn Title="DER">
-            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(context.Id))">Download</FluentButton>
-        </TemplateColumn>
-        <TemplateColumn Title="Regenerate">
-            <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(context.Id))">Modify</FluentButton>
-        </TemplateColumn>
-    </FluentDataGrid>
-}
-else
-{
-    <p>No certificates found.</p>
-}
+        EnsureSelection(certificates);
 
+        var solutions = certificates
+            .GroupBy(c => GetSolutionName(c))
+            .Select(group => new SolutionSummary(group.Key, group.Count(), group.Max(c => c.Creation)))
+            .OrderBy(summary => summary.Name)
+            .ToList();
 
+        var solutionCertificates = certificates
+            .Where(c => GetSolutionName(c) == SelectedSolution)
+            .OrderByDescending(c => c.Creation)
+            .ThenBy(c => GetCertificateTitle(c))
+            .ToList();
+
+        var selectedCertificate = solutionCertificates.FirstOrDefault(c => c.Id == SelectedCertificateId)
+            ?? solutionCertificates.FirstOrDefault();
+
+        <div class="certificate-workspace">
+            <section class="certificate-panel certificate-solution-panel">
+                <div class="certificate-panel-header">
+                    <span>Solutions</span>
+                    <strong>@solutions.Count</strong>
+                </div>
+
+                <div class="certificate-solution-list">
+                    @foreach (var solution in solutions)
+                    {
+                        var isSelected = solution.Name == SelectedSolution;
+
+                        <button type="button"
+                                class="certificate-solution-item @(isSelected ? "selected" : "")"
+                                @onclick="() => SelectSolution(solution.Name, certificates)">
+                            <span>@solution.Name</span>
+                            <small>@solution.Count certificate@(solution.Count == 1 ? string.Empty : "s")</small>
+                        </button>
+                    }
+                </div>
+            </section>
+
+            <section class="certificate-panel certificate-list-panel">
+                <div class="certificate-panel-header">
+                    <span>@SelectedSolution</span>
+                    <FluentButton Appearance="Appearance.Accent" OnClick="() => ViewModel?.Regenerate(-1)">New</FluentButton>
+                </div>
+
+                <div class="certificate-list">
+                    @foreach (var certificate in solutionCertificates)
+                    {
+                        var isSelected = certificate.Id == selectedCertificate?.Id;
+
+                        <button type="button"
+                                class="certificate-list-item @(isSelected ? "selected" : "")"
+                                @onclick="() => SelectCertificate(certificate)">
+                            <span class="certificate-list-title">@GetCertificateTitle(certificate)</span>
+                            <span class="certificate-list-meta">CN: @Display(certificate.CN)</span>
+                            <span class="certificate-list-meta">DNS: @JoinValues(certificate.DNS)</span>
+                            <span class="certificate-list-footer">
+                                <span>@Display(certificate.KeyAlgorithm)</span>
+                                <span>@certificate.Creation.ToString("yyyy-MM-dd")</span>
+                            </span>
+                        </button>
+                    }
+                </div>
+            </section>
+
+            <section class="certificate-panel certificate-detail-panel">
+                @if (selectedCertificate is null)
+                {
+                    <p>No certificate selected.</p>
+                }
+                else
+                {
+                    <div class="certificate-detail-header">
+                        <div>
+                            <h3>@GetCertificateTitle(selectedCertificate)</h3>
+                            <span>@Display(selectedCertificate.CN)</span>
+                        </div>
+                        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(selectedCertificate.Id))">Modify</FluentButton>
+                    </div>
+
+                    <div class="certificate-detail-actions">
+                        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(selectedCertificate.Id))">PFX</FluentButton>
+                        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(selectedCertificate.Id))">CA Root</FluentButton>
+                        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(selectedCertificate.Id))">DER</FluentButton>
+                        <FluentButton Color="Color.Accent" OnClick="(() => ShowThumbprint(selectedCertificate.RootThumbPrint))">Thumbprint</FluentButton>
+                    </div>
+
+                    <div class="certificate-detail-grid">
+                        <span>Solution</span><strong>@Display(selectedCertificate.Solution)</strong>
+                        <span>Name</span><strong>@Display(selectedCertificate.Name)</strong>
+                        <span>Organization</span><strong>@Display(selectedCertificate.Company)</strong>
+                        <span>Application URI</span><strong>@Display(selectedCertificate.ApplicationUri)</strong>
+                        <span>Address</span><strong>@Display(selectedCertificate.Address)</strong>
+                        <span>DNS</span><strong>@JoinValues(selectedCertificate.DNS)</strong>
+                        <span>IP</span><strong>@JoinValues(selectedCertificate.IpAddresses)</strong>
+                        <span>Algorithm</span><strong>@Display(selectedCertificate.KeyAlgorithm)</strong>
+                        <span>Key Usage</span><strong>@JoinValues(selectedCertificate.KeyUsages)</strong>
+                        <span>OID</span><strong>@Display(selectedCertificate.Oid)</strong>
+                        <span>Valid From</span><strong>@FormatDate(selectedCertificate.ValidFromUtc)</strong>
+                        <span>Valid To</span><strong>@FormatDate(selectedCertificate.ValidToUtc)</strong>
+                        <span>Created</span><strong>@selectedCertificate.Creation.ToString("yyyy-MM-dd HH:mm")</strong>
+                        <span>Root Thumbprint</span><strong class="certificate-mono">@Display(selectedCertificate.RootThumbPrint)</strong>
+                    </div>
+                }
+            </section>
+        </div>
+    }
+    else
+    {
+        <p>No certificates found.</p>
+    }
+</div>
 
 @code {
-
+    string? SelectedSolution { get; set; }
+    int? SelectedCertificateId { get; set; }
 
     protected async override Task OnInitializedAsync()
     {
-        // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
-        base.OnInitializedAsync();
+        await base.OnInitializedAsync();
+    }
+
+    private void EnsureSelection(IReadOnlyList<Certificate> certificates)
+    {
+        if(certificates.Count == 0)
+        {
+            SelectedSolution = null;
+            SelectedCertificateId = null;
+            return;
+        }
+
+        if(string.IsNullOrWhiteSpace(SelectedSolution)
+            || !certificates.Any(c => GetSolutionName(c) == SelectedSolution))
+        {
+            SelectedSolution = GetSolutionName(certificates[0]);
+        }
+
+        var selectedCertificate = certificates
+            .Where(c => GetSolutionName(c) == SelectedSolution)
+            .OrderByDescending(c => c.Creation)
+            .FirstOrDefault();
+
+        if(SelectedCertificateId is null
+            || !certificates.Any(c => c.Id == SelectedCertificateId && GetSolutionName(c) == SelectedSolution))
+        {
+            SelectedCertificateId = selectedCertificate?.Id;
+        }
+    }
+
+    private void SelectSolution(string solution, IReadOnlyList<Certificate> certificates)
+    {
+        SelectedSolution = solution;
+        SelectedCertificateId = certificates
+            .Where(c => GetSolutionName(c) == solution)
+            .OrderByDescending(c => c.Creation)
+            .FirstOrDefault()
+            ?.Id;
+    }
+
+    private void SelectCertificate(Certificate certificate)
+    {
+        SelectedSolution = GetSolutionName(certificate);
+        SelectedCertificateId = certificate.Id;
     }
 
     private async Task ShowThumbprint(string? thumbprint)
@@ -73,4 +195,46 @@ else
         await JSRuntime.InvokeVoidAsync("showAlert", message);
     }
 
+    private static string GetSolutionName(Certificate certificate)
+    {
+        return string.IsNullOrWhiteSpace(certificate.Solution)
+            ? "Unassigned"
+            : certificate.Solution;
+    }
+
+    private static string GetCertificateTitle(Certificate certificate)
+    {
+        if(!string.IsNullOrWhiteSpace(certificate.Name))
+        {
+            return certificate.Name;
+        }
+
+        if(!string.IsNullOrWhiteSpace(certificate.CN))
+        {
+            return certificate.CN;
+        }
+
+        return $"Certificate {certificate.Id}";
+    }
+
+    private static string Display(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value;
+    }
+
+    private static string JoinValues(IEnumerable<string>? values)
+    {
+        var result = values?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+
+        return result is { Length: > 0 } ? string.Join(", ", result) : "-";
+    }
+
+    private static string FormatDate(DateTimeOffset? value)
+    {
+        return value?.ToString("yyyy-MM-dd") ?? "-";
+    }
+
+    private sealed record SolutionSummary(string Name, int Count, DateTime LastCreated);
 }

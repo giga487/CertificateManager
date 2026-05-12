@@ -38,7 +38,11 @@ namespace CertificateManager.src
         public bool GetIDBySolution(string solutionName, out int? id)
         {
             id = -1;
-            var solution = CertificatesDB.Find(t => string.Compare(solutionName, t.Solution, true) == 0);
+            var solution = CertificatesDB
+                .Where(t => string.Compare(solutionName, t.Solution, true) == 0)
+                .OrderByDescending(t => t.Creation)
+                .ThenByDescending(t => t.Id)
+                .FirstOrDefault();
 
             if(solution == null)
                 return false;
@@ -62,13 +66,6 @@ namespace CertificateManager.src
 
         public void Add(string solution, Certificate cert)
         {
-            var found = CertificatesDB.Find(t => string.Compare(t.Solution, solution, true) == 0);
-
-            if(found != null)
-            {
-                CertificatesDB.Remove(found);
-            }
-
             CertificatesDB.Add(cert);
 
         }

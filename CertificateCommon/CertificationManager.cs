@@ -472,10 +472,8 @@ namespace CertificateCommon
                 Logger?.Information($"Created: {x509Son}");
             }
 
-            // Build path: Output/Solution/Name or Output/Solution if Name is not provided
-            string path = string.IsNullOrEmpty(request.Name)
-                ? Path.Combine(_dir, request.Solution!)
-                : Path.Combine(_dir, request.Solution!, request.Name);
+            var certificateName = ResolveCertificateFolderName(request);
+            string path = Path.Combine(_dir, request.Solution!, certificateName);
 
             if(!Directory.Exists(path))
             {
@@ -517,7 +515,7 @@ namespace CertificateCommon
 
                     FileManager?.Add(commonName: request.CommonName!, company: request.Organization!, oid: string.Join(",", request.EnhancedKeyUsages),
                         pfxFile: pfxFileName, crtRoot: certFileNameRoot, derFile: derFileName, solution: request.Solution!,
-                        name: request.Name, password: pfxPassword, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), applicationUri: request.ApplicationUri, dns: request.DnsNames,
+                        name: certificateName, password: pfxPassword, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), applicationUri: request.ApplicationUri, dns: request.DnsNames,
                         ipAddresses: request.IpAddresses, organizationalUnit: request.OrganizationalUnit, locality: request.Locality, state: request.State,
                         country: request.Country, validFromUtc: request.ValidFromUtc, validToUtc: request.ValidToUtc, keyUsages: request.KeyUsages, keyAlgorithm: resolvedKeyAlgorithm.ToString(),
                         signatureHashAlgorithm: request.SignatureHashAlgorithm);
@@ -531,6 +529,55 @@ namespace CertificateCommon
             }
 
             return fileInfo;
+        }
+
+        private string ResolveCertificateFolderName(CertificateGenerationRequest request)
+        {
+            var requestedName = !string.IsNullOrWhiteSpace(request.Name)
+                ? request.Name
+                : request.CommonName;
+
+            var baseName = SanitizePathSegment(requestedName, "Certificate");
+            var solutionPath = Path.Combine(_dir, request.Solution!);
+            var candidateName = baseName;
+            var candidatePath = Path.Combine(solutionPath, candidateName);
+
+            if(!Directory.Exists(candidatePath) && !CertificateNameExists(request.Solution!, candidateName))
+            {
+                return candidateName;
+            }
+
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+            candidateName = $"{baseName}-{timestamp}";
+            candidatePath = Path.Combine(solutionPath, candidateName);
+
+            var index = 2;
+            while(Directory.Exists(candidatePath) || CertificateNameExists(request.Solution!, candidateName))
+            {
+                candidateName = $"{baseName}-{timestamp}-{index}";
+                candidatePath = Path.Combine(solutionPath, candidateName);
+                index++;
+            }
+
+            return candidateName;
+        }
+
+        private bool CertificateNameExists(string solution, string name)
+        {
+            return FileManager?.JSONMemory?.CertificatesDB.Any(certificate =>
+                string.Equals(certificate.Solution, solution, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(certificate.Name, name, StringComparison.OrdinalIgnoreCase)) ?? false;
+        }
+
+        private static string SanitizePathSegment(string? value, string fallback)
+        {
+            var text = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var sanitized = new string(text.Select(character =>
+                invalidChars.Contains(character) ? '_' : character).ToArray());
+
+            sanitized = sanitized.Trim().Trim('.');
+            return string.IsNullOrWhiteSpace(sanitized) ? fallback : sanitized;
         }
 
         public List<CertficateFileInfo> CreatingPFX_CRT(string? commonName, string? oid, string? serverAddress, string? company, string? exportPWD, DateTimeOffset expiring, string? solutionFolder, string? name = null, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt", params string[] serverDNS)

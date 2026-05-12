@@ -346,6 +346,166 @@ code {
     white-space: normal;
 }
 
+.certificate-overview-page {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+    min-height: 0;
+}
+
+.certificate-workspace {
+    display: grid;
+    grid-template-columns: minmax(180px, 240px) minmax(260px, 380px) minmax(340px, 1fr);
+    gap: 12px;
+    min-height: 0;
+    height: calc(100dvh - 160px);
+}
+
+.certificate-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid var(--neutral-stroke-rest);
+    border-radius: 4px;
+    background: var(--neutral-layer-1);
+    overflow: hidden;
+}
+
+.certificate-panel-header,
+.certificate-detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--neutral-stroke-rest);
+}
+
+.certificate-panel-header {
+    font-weight: 600;
+}
+
+.certificate-solution-list,
+.certificate-list,
+.certificate-detail-panel {
+    overflow: auto;
+}
+
+.certificate-solution-list,
+.certificate-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+}
+
+.certificate-solution-item,
+.certificate-list-item {
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+    border: 1px solid var(--neutral-stroke-rest);
+    border-radius: 4px;
+    background: var(--neutral-fill-rest);
+    color: var(--neutral-foreground-rest);
+    cursor: pointer;
+    font: inherit;
+}
+
+.certificate-solution-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 10px;
+}
+
+.certificate-solution-item.selected,
+.certificate-list-item.selected {
+    border-color: var(--accent-fill-rest);
+    background: var(--accent-fill-rest);
+    color: var(--neutral-foreground-on-accent-rest);
+}
+
+.certificate-solution-item small,
+.certificate-list-meta,
+.certificate-list-footer {
+    color: var(--neutral-foreground-hint);
+    font-size: 0.85rem;
+}
+
+.certificate-solution-item.selected small,
+.certificate-list-item.selected .certificate-list-meta,
+.certificate-list-item.selected .certificate-list-footer {
+    color: var(--neutral-foreground-on-accent-rest);
+}
+
+.certificate-list-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px;
+}
+
+.certificate-list-title {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.certificate-list-meta {
+    overflow-wrap: anywhere;
+}
+
+.certificate-list-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.certificate-detail-panel {
+    padding-bottom: 12px;
+}
+
+.certificate-detail-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+}
+
+.certificate-detail-header span {
+    color: var(--neutral-foreground-hint);
+}
+
+.certificate-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--neutral-stroke-rest);
+}
+
+.certificate-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+    padding: 8px 12px;
+}
+
+.certificate-detail-grid > * {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--neutral-stroke-rest);
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.certificate-detail-grid > span {
+    color: var(--neutral-foreground-hint);
+}
+
+.certificate-mono {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.9rem;
+}
+
 @media (max-width: 700px) {
     .ca-root-details {
         grid-template-columns: 1fr;
@@ -353,6 +513,28 @@ code {
 
     .ca-root-row {
         display: grid;
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1100px) {
+    .certificate-workspace {
+        grid-template-columns: minmax(170px, 220px) minmax(0, 1fr);
+        height: auto;
+    }
+
+    .certificate-detail-panel {
+        grid-column: 1 / -1;
+        max-height: none;
+    }
+}
+
+@media (max-width: 720px) {
+    .certificate-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .certificate-detail-grid {
         grid-template-columns: 1fr;
     }
 }
