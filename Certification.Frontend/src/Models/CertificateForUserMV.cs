@@ -90,14 +90,25 @@ namespace CertificateManager.Client.src.Models
             }
         }
 
-        public async void DownloadCRT(int? id, string solution)
+        public async void DownloadRootCRT(int? id, string solution)
         {
-            _logger?.Information($"CRT: {id}");
+            _logger?.Information($"Root CRT: {id}");
             try
             {
+                await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime, prefix: solution, fallbackFileName: "Root.crt");
+            }
+            catch(OperationCanceledException ex)
+            {
 
-                await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime, prefix: solution);
+            }
+        }
 
+        public async void DownloadRootDER(int? id, string solution)
+        {
+            _logger?.Information($"Root DER: {id}");
+            try
+            {
+                await _factory?.Download($"api/Certificate/downloadRootDER?id={id}", runtime: _jsRuntime, prefix: solution, fallbackFileName: "Root.der");
             }
             catch(OperationCanceledException ex)
             {
@@ -107,10 +118,10 @@ namespace CertificateManager.Client.src.Models
 
         public async void DownloadDER(int? id, string solution)
         {
-            _logger?.Information($"DER: {id}");
+            _logger?.Information($"Certificate DER: {id}");
             try
             {
-                await _factory?.Download($"api/Certificate/downloadDER?id={id}", runtime: _jsRuntime, prefix: solution);
+                await _factory?.Download($"api/Certificate/downloadDER?id={id}", runtime: _jsRuntime, prefix: solution, fallbackFileName: "Certificate.der");
             }
             catch(OperationCanceledException ex)
             {

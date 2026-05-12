@@ -154,9 +154,10 @@
             <FluentStack xs="12"><FluentLabel>@IDString</FluentLabel></FluentStack>
 
             <FluentStack xs="12">
-                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(ViewModel.CreatedCRTId, Solution))">Download PFX</FluentButton>
-                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadCRT(ViewModel.CreatedCRTId, Solution))">Download CRT</FluentButton>
-                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(ViewModel.CreatedCRTId, Solution))">Download DER</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(ViewModel.CreatedCRTId, Solution))">PFX del certificato</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadRootCRT(ViewModel.CreatedCRTId, Solution))">Root CRT</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadRootDER(ViewModel.CreatedCRTId, Solution))">Root DER</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(ViewModel.CreatedCRTId, Solution))">Certificato DER</FluentButton>
             </FluentStack>
 
             <FluentStack>

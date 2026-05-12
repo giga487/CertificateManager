@@ -16,6 +16,7 @@ namespace CertificateManager.src
         CARootNoKey = 3,
         CRT = 4,
         DER = 5,
+        CARootDER = 6,
 
     }
 
@@ -139,6 +140,7 @@ namespace CertificateManager.src
         public string? PFXCertificate { get; init; }
         public string? CRTCertificate { get; init; }
         public string? DERCertificate { get; init; }
+        public string? RootDERCertificate { get; init; }
         public DateTime Creation { get; init; } = DateTime.Now;
         public DateTimeOffset? ValidFromUtc { get; init; }
         public DateTimeOffset? ValidToUtc { get; init; }
@@ -299,6 +301,11 @@ namespace CertificateManager.src
                     files[CertificateTypes.DER] = dataFound.DERCertificate;
                 }
 
+                if(!string.IsNullOrEmpty(dataFound.RootDERCertificate))
+                {
+                    files[CertificateTypes.CARootDER] = dataFound.RootDERCertificate;
+                }
+
                 return files;
             }
             finally
@@ -376,6 +383,7 @@ namespace CertificateManager.src
                 CRTCertificate = source.CRTCertificate,
                 PFXCertificate = source.PFXCertificate,
                 DERCertificate = source.DERCertificate,
+                RootDERCertificate = source.RootDERCertificate,
                 CN = source.CN,
                 Company = source.Company,
                 OrganizationalUnit = source.OrganizationalUnit,
@@ -408,6 +416,7 @@ namespace CertificateManager.src
             string commonName,
             string crtRoot,
             string? derFile,
+            string? rootDerFile,
             string solution,
             string? name,
             string password,
@@ -434,6 +443,7 @@ namespace CertificateManager.src
                     CRTCertificate = crtRoot,
                     PFXCertificate = pfxFile,
                     DERCertificate = derFile,
+                    RootDERCertificate = rootDerFile,
                     CN = commonName,
                     Company = company,
                     OrganizationalUnit = organizationalUnit,

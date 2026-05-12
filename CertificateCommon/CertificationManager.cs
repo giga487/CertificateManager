@@ -513,8 +513,12 @@ namespace CertificateCommon
                     string certFileNameRoot = Path.Join(path, "Root.crt");
                     fileInfo.Add(ExtractRoot(certFileNameRoot));
 
+                    string derFileNameRoot = Path.Join(path, "Root.der");
+                    File.WriteAllBytes(derFileNameRoot, CARoot.Export(X509ContentType.Cert));
+                    fileInfo.Add(new CertficateFileInfo(derFileNameRoot, CARoot));
+
                     FileManager?.Add(commonName: request.CommonName!, company: request.Organization!, oid: string.Join(",", request.EnhancedKeyUsages),
-                        pfxFile: pfxFileName, crtRoot: certFileNameRoot, derFile: derFileName, solution: request.Solution!,
+                        pfxFile: pfxFileName, crtRoot: certFileNameRoot, derFile: derFileName, rootDerFile: derFileNameRoot, solution: request.Solution!,
                         name: certificateName, password: pfxPassword, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), applicationUri: request.ApplicationUri, dns: request.DnsNames,
                         ipAddresses: request.IpAddresses, organizationalUnit: request.OrganizationalUnit, locality: request.Locality, state: request.State,
                         country: request.Country, validFromUtc: request.ValidFromUtc, validToUtc: request.ValidToUtc, keyUsages: request.KeyUsages, keyAlgorithm: resolvedKeyAlgorithm.ToString(),

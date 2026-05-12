@@ -102,9 +102,10 @@
                     </div>
 
                     <div class="certificate-detail-actions">
-                        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(selectedCertificate.Id))">PFX</FluentButton>
-                        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadCRT(selectedCertificate.Id))">CA Root</FluentButton>
-                        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(selectedCertificate.Id))">DER</FluentButton>
+                        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(selectedCertificate.Id))">PFX del certificato</FluentButton>
+                        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadRootCRT(selectedCertificate.Id))">Root CRT</FluentButton>
+                        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadRootDER(selectedCertificate.Id))">Root DER</FluentButton>
+                        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(selectedCertificate.Id))">Certificato DER</FluentButton>
                         <FluentButton Color="Color.Accent" OnClick="(() => ShowThumbprint(selectedCertificate.RootThumbPrint))">Thumbprint</FluentButton>
                     </div>
 

@@ -131,14 +131,30 @@ namespace CertificateManager.Client.src.Models
         }
 
 
-        public async void DownloadCRT(int? id)
+        public async void DownloadRootCRT(int? id)
         {
-            _logger?.Information($"CRT: {id}");
+            _logger?.Information($"Root CRT: {id}");
             try
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime, prefix: found.Solution);
+                    await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime, prefix: found.Solution, fallbackFileName: "Root.crt");
+                }
+            }
+            catch(OperationCanceledException ex)
+            {
+
+            }
+        }
+
+        public async void DownloadRootDER(int? id)
+        {
+            _logger?.Information($"Root DER: {id}");
+            try
+            {
+                if(Certificates?.Get(id ?? 0, out var found) ?? false)
+                {
+                    await _factory?.Download($"api/Certificate/downloadRootDER?id={id}", runtime: _jsRuntime, prefix: found.Solution, fallbackFileName: "Root.der");
                 }
             }
             catch(OperationCanceledException ex)
@@ -149,12 +165,12 @@ namespace CertificateManager.Client.src.Models
 
         public async void DownloadDER(int? id)
         {
-            _logger?.Information($"DER: {id}");
+            _logger?.Information($"Certificate DER: {id}");
             try
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadDER?id={id}", runtime: _jsRuntime, prefix: found.Solution);
+                    await _factory?.Download($"api/Certificate/downloadDER?id={id}", runtime: _jsRuntime, prefix: found.Solution, fallbackFileName: "Certificate.der");
                 }
             }
             catch(OperationCanceledException ex)

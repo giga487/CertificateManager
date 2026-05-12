@@ -159,12 +159,12 @@ namespace Certification.Backend.Controllers
 		}
 
 		[HttpGet("downloadCRT")]
-		public IActionResult DownloadFileCRT(int id)
+		public IActionResult DownloadFileRootCRT(int id)
 		{
 			var result = CertificationManager.FileManager?.RetrieveCertificates(id);
 			if(result is null || !result.TryGetValue(CertificateTypes.CARootNoKey, out var filePath))
 			{
-				return NotFound($"No CRT certificate with ID: {id}");
+				return NotFound($"No root CRT certificate with ID: {id}");
 			}
 
 			var file = new FileStream(filePath, FileMode.Open, FileAccess.Read);
@@ -173,11 +173,29 @@ namespace Certification.Backend.Controllers
 			file.Position = 0;
 			Logger?.Warning($"Sha {filePath}: {sha}");
 
-			return File(file, "application/octet-stream", "FCNXTCA.crt");
+			return File(file, "application/x-x509-ca-cert", "Root.crt");
+		}
+
+		[HttpGet("downloadRootDER")]
+		public IActionResult DownloadFileRootDER(int id)
+		{
+			var result = CertificationManager.FileManager?.RetrieveCertificates(id);
+			if(result is null || !result.TryGetValue(CertificateTypes.CARootDER, out var filePath))
+			{
+				return NotFound($"No root DER certificate with ID: {id}");
+			}
+
+			var file = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+
+			string sha = CertificationManager.FileManager!.ShaManager.HashFile(file);
+			file.Position = 0;
+			Logger?.Warning($"Sha {filePath}: {sha}");
+
+			return File(file, "application/pkix-cert", "Root.der");
 		}
 
 		[HttpGet("downloadDER")]
-		public IActionResult DownloadFileDER(int id)
+		public IActionResult DownloadFileCertificateDER(int id)
 		{
 			var result = CertificationManager.FileManager?.RetrieveCertificates(id);
 			if(result is null || !result.TryGetValue(CertificateTypes.DER, out var filePath))
