@@ -31,7 +31,7 @@ namespace CertificateManager.src
         public DateTimeOffset ValidFromUtc { get; init; } = DateTimeOffset.UtcNow;
         public DateTimeOffset ValidToUtc { get; init; } = DateTimeOffset.UtcNow.AddYears(10);
         public CertificatePrivateKeyAlgorithm KeyAlgorithm { get; init; } = CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot;
-        public string SignatureHashAlgorithm { get; init; } = "SHA384";
+        public string SignatureHashAlgorithm { get; init; } = "AutoFromIssuerRoot";
         public bool ExportPrivateKeyPem { get; init; } = true;
 
         public IReadOnlyList<string> Validate()
@@ -57,6 +57,12 @@ namespace CertificateManager.src
             if (!Enum.IsDefined(KeyAlgorithm))
             {
                 errors.Add("Unsupported private key algorithm.");
+            }
+
+            if(string.IsNullOrWhiteSpace(SignatureHashAlgorithm)
+                || !SupportedSignatureHashAlgorithms.Contains(SignatureHashAlgorithm.Trim(), StringComparer.OrdinalIgnoreCase))
+            {
+                errors.Add("Unsupported signature hash algorithm.");
             }
 
             foreach (var dnsName in DnsNames.Where(x => !string.IsNullOrWhiteSpace(x)))
@@ -119,6 +125,14 @@ namespace CertificateManager.src
             "KeyAgreement",
             "KeyCertSign",
             "CrlSign"
+        ];
+
+        public static readonly string[] SupportedSignatureHashAlgorithms =
+        [
+            "AutoFromIssuerRoot",
+            "SHA256",
+            "SHA384",
+            "SHA512"
         ];
 
         private static void RequireText(string? value, string fieldName, ICollection<string> errors)

@@ -705,7 +705,7 @@ namespace CertificateCommon
 
             var subject = CreateSubject(request);
 
-            var serverRequest = CreateCertificateRequest(subject, privateKey, ResolveHashAlgorithm(request.SignatureHashAlgorithm));
+            var serverRequest = CreateCertificateRequest(subject, privateKey, ResolveHashAlgorithm(request.SignatureHashAlgorithm, issuer));
 
             // Aggiungi le estensioni necessarie per un certificato server
             serverRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(isCertificateAuthority, isCertificateAuthority, 0, true));
@@ -889,15 +889,38 @@ namespace CertificateCommon
                 .Replace(";", "\\;");
         }
 
-        private static HashAlgorithmName ResolveHashAlgorithm(string? algorithm)
+        private static HashAlgorithmName ResolveHashAlgorithm(string? algorithm, X509Certificate2 issuer)
         {
             return algorithm?.Trim().ToUpperInvariant() switch
             {
+                "AUTOFROMISSUERROOT" => ResolveHashAlgorithmFromIssuer(issuer),
                 "SHA256" => HashAlgorithmName.SHA256,
                 "SHA384" => HashAlgorithmName.SHA384,
                 "SHA512" => HashAlgorithmName.SHA512,
                 _ => HashAlgorithmName.SHA384
             };
+        }
+
+        private static HashAlgorithmName ResolveHashAlgorithmFromIssuer(X509Certificate2 issuer)
+        {
+            var signatureAlgorithm = $"{issuer.SignatureAlgorithm.FriendlyName} {issuer.SignatureAlgorithm.Value}".ToUpperInvariant();
+
+            if(signatureAlgorithm.Contains("SHA512") || signatureAlgorithm.Contains("1.2.840.10045.4.3.4") || signatureAlgorithm.Contains("1.2.840.113549.1.1.13"))
+            {
+                return HashAlgorithmName.SHA512;
+            }
+
+            if(signatureAlgorithm.Contains("SHA384") || signatureAlgorithm.Contains("1.2.840.10045.4.3.3") || signatureAlgorithm.Contains("1.2.840.113549.1.1.12"))
+            {
+                return HashAlgorithmName.SHA384;
+            }
+
+            if(signatureAlgorithm.Contains("SHA256") || signatureAlgorithm.Contains("1.2.840.10045.4.3.2") || signatureAlgorithm.Contains("1.2.840.113549.1.1.11"))
+            {
+                return HashAlgorithmName.SHA256;
+            }
+
+            return HashAlgorithmName.SHA384;
         }
 
         private static X509KeyUsageFlags ResolveKeyUsages(IEnumerable<string> keyUsages)
