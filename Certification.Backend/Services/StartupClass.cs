@@ -19,7 +19,7 @@ namespace Certification.Backend.Services
 			Logger?.Information($"Working in {workingPath}");
 			Logger?.Information("Starting the backend application");
 
-			if(Manager?.CARoot is null)
+			if(Manager?.CertificateAuthorities.GetDefaultIssuer() is null && Manager?.CARoot is null)
 			{
 				throw new CARootNotFoundException();
 			}

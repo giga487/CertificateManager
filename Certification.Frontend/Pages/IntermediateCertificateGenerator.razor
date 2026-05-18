@@ -1,0 +1,307 @@
+@page "/intermediate-ca"
+@using CertificateManager.src
+@using CertificateManager.Client.src.Models
+@inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
+
+@inherits Page<CreateForCertificateMV>
+
+<PageTitle>Create Intermediate CA</PageTitle>
+
+<FluentStack Spacing="10" Orientation="Orientation.Vertical">
+    <FluentStack xs="12">
+        <h2>Create Intermediate CA</h2>
+    </FluentStack>
+
+    <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
+        <FluentTextArea Rows="1" @bind-Value=Solution>Solution</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Name>Name</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=CommonName>Common Name</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Organization>Organization</FluentTextArea>
+    </FluentStack>
+
+    <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
+        <FluentLabel Weight="FontWeight.Bold">Signing CA</FluentLabel>
+        @if(IssuerAuthorities.Any())
+        {
+            <select class="oid-filter-input" value="@SelectedIssuerAuthorityId" @onchange="OnIssuerAuthorityChanged">
+                @foreach(var authority in IssuerAuthorities)
+                {
+                    <option value="@authority.Id">@FormatAuthority(authority)</option>
+                }
+            </select>
+        }
+        else
+        {
+            <FluentMessageBar Intent="MessageIntent.Warning">No signing CA with private key is available.</FluentMessageBar>
+        }
+    </FluentStack>
+
+    <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
+        <FluentTextArea Rows="1" @bind-Value=OrganizationalUnit>Organizational Unit</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Locality>Locality</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=State>State</FluentTextArea>
+        <FluentTextArea Rows="1" @bind-Value=Country>Country</FluentTextArea>
+    </FluentStack>
+
+    <FluentStack Orientation="Orientation.Vertical">
+        <FluentCheckbox @bind-Value=UsePfxPassword>Protect PFX with password</FluentCheckbox>
+        @if(UsePfxPassword)
+        {
+            <FluentTextArea Rows="1" @bind-Value=Password>PFX Password</FluentTextArea>
+        }
+    </FluentStack>
+
+    <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
+        <div class="certificate-date-field">
+            <FluentDatePicker Label="Valid From UTC" @bind-Value=ValidFrom />
+        </div>
+        <div class="certificate-date-field">
+            <FluentDatePicker Label="Valid To UTC" @bind-Value=ValidTo />
+        </div>
+    </FluentStack>
+
+    <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
+        <FluentLabel Weight="FontWeight.Bold">Private Key Algorithm</FluentLabel>
+        <select class="oid-filter-input" @bind="KeyAlgorithm">
+            <option value="@CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot">Auto (issuer algorithm)</option>
+            <option value="@CertificatePrivateKeyAlgorithm.Rsa2048">RSA 2048</option>
+            <option value="@CertificatePrivateKeyAlgorithm.Rsa3072">RSA 3072</option>
+            <option value="@CertificatePrivateKeyAlgorithm.Rsa4096">RSA 4096</option>
+            <option value="@CertificatePrivateKeyAlgorithm.EcdsaP256">ECDSA P-256</option>
+            <option value="@CertificatePrivateKeyAlgorithm.EcdsaP384">ECDSA P-384</option>
+        </select>
+    </FluentStack>
+
+    @if(!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <FluentMessageBar Intent="MessageIntent.Error">@ErrorMessage</FluentMessageBar>
+    }
+
+    <FluentStack xs="12">
+        <FluentButton Appearance="Appearance.Accent" IconStart="@(new Icons.Regular.Size16.Certificate())" OnClick="MakeIntermediate" Disabled="@(!CanCreateIntermediate)">Create Intermediate CA</FluentButton>
+    </FluentStack>
+
+    @if(Created)
+    {
+        <FluentStack xs="12">
+            <FluentLabel>@IDString</FluentLabel>
+        </FluentStack>
+
+        <FluentStack xs="12">
+            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(ViewModel.CreatedCRTId, DownloadPrefix))">Intermediate PFX</FluentButton>
+            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadIntermediateCRT(ViewModel.CreatedCRTId, DownloadPrefix))">Intermediate CRT</FluentButton>
+            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadRootCRT(ViewModel.CreatedCRTId, DownloadPrefix))">Issuer/Root CRT</FluentButton>
+            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadRootDER(ViewModel.CreatedCRTId, DownloadPrefix))">Root DER</FluentButton>
+            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadCertificatePEM(ViewModel.CreatedCRTId, DownloadPrefix))">Certificato PEM</FluentButton>
+            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadChainCRT(ViewModel.CreatedCRTId, DownloadPrefix))">Catena CRT</FluentButton>
+            <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPrivateKeyPEM(ViewModel.CreatedCRTId, DownloadPrefix))">Chiave PEM</FluentButton>
+        </FluentStack>
+
+        <pre class="pre-formatted-text">@((MarkupString)MakeOutput)</pre>
+    }
+</FluentStack>
+
+@code {
+    string Solution { get; set; } = "";
+    string Name { get; set; } = "";
+    string DownloadPrefix => string.IsNullOrWhiteSpace(Name) ? Solution : Name;
+    string CommonName { get; set; } = "";
+    string Organization { get; set; } = "";
+    string OrganizationalUnit { get; set; } = "";
+    string Locality { get; set; } = "";
+    string State { get; set; } = "";
+    string Country { get; set; } = "";
+    string Password { get; set; } = "";
+    bool UsePfxPassword { get; set; }
+    DateTime? ValidFrom { get; set; } = DateTime.UtcNow.Date;
+    DateTime? ValidTo { get; set; } = DateTime.UtcNow.Date.AddYears(5);
+    CertificatePrivateKeyAlgorithm KeyAlgorithm { get; set; } = CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot;
+    List<CertificateAuthorityInfo> CertificateAuthorities { get; set; } = [];
+    string? SelectedIssuerAuthorityId { get; set; }
+    IEnumerable<CertificateAuthorityInfo> IssuerAuthorities => CertificateAuthorities.Where(authority => authority.IsIssuer && authority.HasPrivateKey);
+    CertificateAuthorityInfo? SelectedIssuerAuthority => IssuerAuthorities.FirstOrDefault(authority => string.Equals(authority.Id, SelectedIssuerAuthorityId, StringComparison.OrdinalIgnoreCase));
+    bool CanCreateIntermediate => IssuerAuthorities.Any() && !string.IsNullOrWhiteSpace(SelectedIssuerAuthorityId);
+    string MakeOutput { get; set; } = "";
+    string IDString { get; set; } = "";
+    string ErrorMessage { get; set; } = "";
+    bool Created { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ApplyIntermediateDefaults(CertificateDefaultsOptions.FromConfiguration(Configuration).IntermediateCertificateAuthority);
+        CertificateAuthorities = await ViewModel.GetCertificateAuthorities();
+        SelectedIssuerAuthorityId = IssuerAuthorities.FirstOrDefault(authority => authority.Role == "Root" && authority.IsDefault)?.Id
+            ?? IssuerAuthorities.FirstOrDefault(authority => authority.Role == "Root")?.Id
+            ?? IssuerAuthorities.FirstOrDefault()?.Id;
+        ApplyIssuerValidityDefaults(forceDefaultTo: true);
+
+        await base.OnInitializedAsync();
+    }
+
+    private void ApplyIntermediateDefaults(CertificateFormDefaults defaults)
+    {
+        Solution = defaults.Solution;
+        Name = defaults.Name;
+        CommonName = defaults.CommonName;
+        Organization = defaults.Organization;
+        OrganizationalUnit = defaults.OrganizationalUnit;
+        Locality = defaults.Locality;
+        State = defaults.State;
+        Country = defaults.Country;
+        Password = defaults.PfxPassword;
+        UsePfxPassword = defaults.UsePfxPassword;
+        ValidFrom = DateTime.UtcNow.Date;
+        ValidTo = DateTime.UtcNow.Date.AddYears(defaults.ValidityYears);
+        KeyAlgorithm = defaults.KeyAlgorithm;
+    }
+
+    private async Task MakeIntermediate()
+    {
+        ErrorMessage = "";
+        Created = false;
+        MakeOutput = "";
+
+        if(ValidFrom is null || ValidTo is null)
+        {
+            ErrorMessage = "Certificate validity dates are not valid.";
+            return;
+        }
+
+        if(!CanCreateIntermediate)
+        {
+            ErrorMessage = "Select a signing CA that has a private key before creating an intermediate CA.";
+            return;
+        }
+
+        if(!ValidateIssuerValidity(out var validityError))
+        {
+            ErrorMessage = validityError;
+            return;
+        }
+
+        var request = new CertificateGenerationRequest
+        {
+            Solution = Solution,
+            Name = Name,
+            CommonName = CommonName,
+            Organization = Organization,
+            OrganizationalUnit = OrganizationalUnit,
+            Locality = Locality,
+            State = State,
+            Country = Country,
+            PfxPassword = UsePfxPassword ? Password : string.Empty,
+            KeyUsages = ["KeyCertSign", "CrlSign"],
+            EnhancedKeyUsages = [],
+            ValidFromUtc = new DateTimeOffset(DateTime.SpecifyKind(ValidFrom.Value.Date, DateTimeKind.Utc)),
+            ValidToUtc = new DateTimeOffset(DateTime.SpecifyKind(ValidTo.Value.Date, DateTimeKind.Utc)),
+            IssuerAuthorityId = SelectedIssuerAuthorityId,
+            KeyAlgorithm = KeyAlgorithm,
+            SignatureHashAlgorithm = "AutoFromIssuerRoot",
+            ExportPrivateKeyPem = true
+        };
+
+        var result = await ViewModel.MakeIntermediate(request);
+        if(result is null || result.Count == 0)
+        {
+            ErrorMessage = string.IsNullOrWhiteSpace(ViewModel.LastError)
+                ? "Intermediate CA was not created."
+                : ViewModel.LastError;
+            return;
+        }
+
+        foreach(var item in result)
+        {
+            MakeOutput += $"Created: {item.Created}, Algorithm: {FormatKeyAlgorithm(item.KeyAlgorithm ?? KeyAlgorithm.ToString())}, ThumbPrint: {item.ThumbPrint}, Serial: {item.SerialNumber}<br>";
+        }
+
+        Created = true;
+        IDString = $"Created intermediate CA {ViewModel.CreatedCRTId}";
+        ViewModel.OnStateChange("Update the output");
+    }
+
+    private void OnIssuerAuthorityChanged(ChangeEventArgs args)
+    {
+        SelectedIssuerAuthorityId = args.Value?.ToString();
+        ApplyIssuerValidityDefaults(forceDefaultTo: true);
+    }
+
+    private void ApplyIssuerValidityDefaults(bool forceDefaultTo)
+    {
+        var issuer = SelectedIssuerAuthority;
+        if(issuer is null)
+        {
+            return;
+        }
+
+        var issuerStart = issuer.NotBefore.ToUniversalTime().Date;
+        var issuerEnd = issuer.NotAfter.ToUniversalTime().Date;
+        var today = DateTime.UtcNow.Date;
+
+        if(ValidFrom is null || ValidFrom.Value.Date < issuerStart)
+        {
+            ValidFrom = issuerStart > today ? issuerStart : today;
+        }
+
+        if(forceDefaultTo || ValidTo is null || ValidTo.Value.Date > issuerEnd)
+        {
+            var preferredEnd = ValidFrom.Value.Date.AddYears(5);
+            ValidTo = preferredEnd <= issuerEnd ? preferredEnd : issuerEnd;
+        }
+
+        if(ValidTo.Value.Date <= ValidFrom.Value.Date && issuerEnd > ValidFrom.Value.Date)
+        {
+            ValidTo = issuerEnd;
+        }
+    }
+
+    private bool ValidateIssuerValidity(out string error)
+    {
+        error = string.Empty;
+        var issuer = SelectedIssuerAuthority;
+        if(issuer is null || ValidFrom is null || ValidTo is null)
+        {
+            return true;
+        }
+
+        var issuerStart = issuer.NotBefore.ToUniversalTime().Date;
+        var issuerEnd = issuer.NotAfter.ToUniversalTime().Date;
+
+        if(ValidFrom.Value.Date < issuerStart || ValidTo.Value.Date > issuerEnd)
+        {
+            error = $"Intermediate validity must stay within issuer validity: {issuerStart:yyyy-MM-dd} - {issuerEnd:yyyy-MM-dd}.";
+            return false;
+        }
+
+        if(ValidTo.Value.Date <= ValidFrom.Value.Date)
+        {
+            error = "Valid To UTC must be after Valid From UTC.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string FormatAuthority(CertificateAuthorityInfo authority)
+    {
+        var name = string.IsNullOrWhiteSpace(authority.Name)
+            ? authority.Subject ?? authority.Thumbprint ?? "CA"
+            : authority.Name;
+        var role = string.IsNullOrWhiteSpace(authority.Role) ? "CA" : authority.Role;
+        return $"{name} - {role}";
+    }
+
+    private static string FormatKeyAlgorithm(string? keyAlgorithm)
+    {
+        return keyAlgorithm switch
+        {
+            nameof(CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot) => "Auto (issuer algorithm)",
+            nameof(CertificatePrivateKeyAlgorithm.Rsa2048) => "RSA 2048",
+            nameof(CertificatePrivateKeyAlgorithm.Rsa3072) => "RSA 3072",
+            nameof(CertificatePrivateKeyAlgorithm.Rsa4096) => "RSA 4096",
+            nameof(CertificatePrivateKeyAlgorithm.EcdsaP256) => "ECDSA P-256",
+            nameof(CertificatePrivateKeyAlgorithm.EcdsaP384) => "ECDSA P-384",
+            _ => keyAlgorithm ?? string.Empty
+        };
+    }
+}

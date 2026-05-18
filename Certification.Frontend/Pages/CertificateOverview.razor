@@ -20,6 +20,10 @@
             .OrderBy(c => c.Solution ?? string.Empty)
             .ThenByDescending(c => c.Creation)
             .ToList();
+        var authorityLookup = (ViewModel.CertificateAuthorities ?? [])
+            .Where(authority => !string.IsNullOrWhiteSpace(authority.Id))
+            .GroupBy(authority => authority.Id!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
         EnsureSelection(certificates);
 
@@ -33,6 +37,15 @@
             .Where(c => GetSolutionName(c) == SelectedSolution)
             .OrderByDescending(c => c.Creation)
             .ThenBy(c => GetCertificateTitle(c))
+            .ToList();
+        var issuerGroups = solutionCertificates
+            .GroupBy(c => GetIssuerGroupKey(c))
+            .Select(group => new IssuerCertificateGroup(
+                group.Key,
+                GetIssuerDisplayName(group.First(), authorityLookup),
+                GetIssuerGroupSubtitle(group.First(), authorityLookup),
+                group.OrderByDescending(c => c.Creation).ThenBy(c => GetCertificateTitle(c)).ToList()))
+            .OrderBy(group => group.Name)
             .ToList();
 
         var selectedCertificate = solutionCertificates.FirstOrDefault(c => c.Id == SelectedCertificateId)
@@ -67,21 +80,34 @@
                 </div>
 
                 <div class="certificate-list">
-                    @foreach (var certificate in solutionCertificates)
+                    @foreach (var issuerGroup in issuerGroups)
                     {
-                        var isSelected = certificate.Id == selectedCertificate?.Id;
+                        <div class="certificate-issuer-group">
+                            <div class="certificate-issuer-header">
+                                <div>
+                                    <span>@issuerGroup.Name</span>
+                                    <small>@issuerGroup.Subtitle</small>
+                                </div>
+                                <strong>@issuerGroup.Certificates.Count</strong>
+                            </div>
 
-                        <button type="button"
-                                class="certificate-list-item @(isSelected ? "selected" : "")"
-                                @onclick="() => SelectCertificate(certificate)">
-                            <span class="certificate-list-title">@GetCertificateTitle(certificate)</span>
-                            <span class="certificate-list-meta">CN: @Display(certificate.CN)</span>
-                            <span class="certificate-list-meta">DNS: @JoinValues(certificate.DNS)</span>
-                            <span class="certificate-list-footer">
-                                <span>@Display(certificate.KeyAlgorithm)</span>
-                                <span>@certificate.Creation.ToString("yyyy-MM-dd")</span>
-                            </span>
-                        </button>
+                            @foreach (var certificate in issuerGroup.Certificates)
+                            {
+                                var isSelected = certificate.Id == selectedCertificate?.Id;
+
+                                <button type="button"
+                                        class="certificate-list-item @(isSelected ? "selected" : "")"
+                                        @onclick="() => SelectCertificate(certificate)">
+                                    <span class="certificate-list-title">@GetCertificateTitle(certificate)</span>
+                                    <span class="certificate-list-meta">CN: @Display(certificate.CN)</span>
+                                    <span class="certificate-list-meta">DNS: @JoinValues(certificate.DNS)</span>
+                                    <span class="certificate-list-footer">
+                                        <span>@Display(certificate.KeyAlgorithm)</span>
+                                        <span>@certificate.Creation.ToString("yyyy-MM-dd")</span>
+                                    </span>
+                                </button>
+                            }
+                        </div>
                     }
                 </div>
             </section>
@@ -101,12 +127,43 @@
                         <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(selectedCertificate.Id))">Modify</FluentButton>
                     </div>
 
-                    <div class="certificate-detail-actions">
-                        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(selectedCertificate.Id))">PFX del certificato</FluentButton>
-                        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadRootCRT(selectedCertificate.Id))">Root CRT</FluentButton>
-                        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.DownloadRootDER(selectedCertificate.Id))">Root DER</FluentButton>
-                        <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(selectedCertificate.Id))">Certificato DER</FluentButton>
-                        <FluentButton Color="Color.Accent" OnClick="(() => ShowThumbprint(selectedCertificate.RootThumbPrint))">Thumbprint</FluentButton>
+                    <div class="certificate-download-panel">
+                        <select class="oid-filter-input" @bind="SelectedDownload">
+                            <option value="@CertificateDownloadKind.Pfx">PFX</option>
+                            <option value="@CertificateDownloadKind.CertificatePem">Certificate CRT/PEM</option>
+                            <option value="@CertificateDownloadKind.CertificateDer">Certificate DER</option>
+                            <option value="@CertificateDownloadKind.ChainPem">Chain CRT</option>
+                            <option value="@CertificateDownloadKind.RootPem">Root CRT</option>
+                            <option value="@CertificateDownloadKind.RootDer">Root DER</option>
+                            <option value="@CertificateDownloadKind.IntermediatePem">Intermediate CRT</option>
+                            <option value="@CertificateDownloadKind.PrivateKeyPem">Private key PEM</option>
+                            <option value="@CertificateDownloadKind.RootThumbprint">Root thumbprint</option>
+                        </select>
+
+                        @if(SelectedDownload == CertificateDownloadKind.Pfx)
+                        {
+                            <div class="certificate-download-options">
+                                <FluentCheckbox @bind-Value="DownloadPfxWithIntermediates">Include intermediates</FluentCheckbox>
+                                <FluentCheckbox @bind-Value="DownloadPfxWithRoot">Include root CA</FluentCheckbox>
+                            </div>
+                        }
+                        else if(SelectedDownload == CertificateDownloadKind.CertificatePem)
+                        {
+                            <div class="certificate-download-options">
+                                <FluentCheckbox @bind-Value="DownloadCertificateWithIntermediates">Include intermediates</FluentCheckbox>
+                                <FluentCheckbox @bind-Value="DownloadCertificateWithRoot">Include root CA</FluentCheckbox>
+                            </div>
+                        }
+                        else if(SelectedDownload == CertificateDownloadKind.ChainPem)
+                        {
+                            <div class="certificate-download-options">
+                                <FluentCheckbox @bind-Value="DownloadChainWithLeaf">Server</FluentCheckbox>
+                                <FluentCheckbox @bind-Value="DownloadChainWithIntermediates">Intermediates</FluentCheckbox>
+                                <FluentCheckbox @bind-Value="DownloadChainWithRoot">Root CA</FluentCheckbox>
+                            </div>
+                        }
+
+                        <FluentButton Appearance="Appearance.Accent" OnClick="(() => DownloadSelected(selectedCertificate))">Download</FluentButton>
                     </div>
 
                     <div class="certificate-detail-grid">
@@ -118,6 +175,8 @@
                         <span>DNS</span><strong>@JoinValues(selectedCertificate.DNS)</strong>
                         <span>IP</span><strong>@JoinValues(selectedCertificate.IpAddresses)</strong>
                         <span>Algorithm</span><strong>@Display(selectedCertificate.KeyAlgorithm)</strong>
+                        <span>Issuer</span><strong>@GetIssuerDisplayName(selectedCertificate, authorityLookup)</strong>
+                        <span>Issuer Thumbprint</span><strong class="certificate-mono">@Display(selectedCertificate.IssuerThumbPrint)</strong>
                         <span>Key Usage</span><strong>@JoinValues(selectedCertificate.KeyUsages)</strong>
                         <span>OID</span><strong>@Display(selectedCertificate.Oid)</strong>
                         <span>Valid From</span><strong>@FormatDate(selectedCertificate.ValidFromUtc)</strong>
@@ -138,6 +197,14 @@
 @code {
     string? SelectedSolution { get; set; }
     int? SelectedCertificateId { get; set; }
+    CertificateDownloadKind SelectedDownload { get; set; } = CertificateDownloadKind.Pfx;
+    bool DownloadPfxWithIntermediates { get; set; } = true;
+    bool DownloadPfxWithRoot { get; set; }
+    bool DownloadCertificateWithIntermediates { get; set; }
+    bool DownloadCertificateWithRoot { get; set; }
+    bool DownloadChainWithLeaf { get; set; } = true;
+    bool DownloadChainWithIntermediates { get; set; } = true;
+    bool DownloadChainWithRoot { get; set; }
 
     protected async override Task OnInitializedAsync()
     {
@@ -196,6 +263,40 @@
         await JSRuntime.InvokeVoidAsync("showAlert", message);
     }
 
+    private async Task DownloadSelected(Certificate certificate)
+    {
+        switch(SelectedDownload)
+        {
+            case CertificateDownloadKind.Pfx:
+                ViewModel?.DownloadPFX(certificate.Id, DownloadPfxWithIntermediates, DownloadPfxWithRoot);
+                break;
+            case CertificateDownloadKind.CertificatePem:
+                ViewModel?.DownloadCertificatePEM(certificate.Id, DownloadCertificateWithIntermediates, DownloadCertificateWithRoot);
+                break;
+            case CertificateDownloadKind.CertificateDer:
+                ViewModel?.DownloadDER(certificate.Id);
+                break;
+            case CertificateDownloadKind.ChainPem:
+                ViewModel?.DownloadChainCRT(certificate.Id, DownloadChainWithLeaf, DownloadChainWithIntermediates, DownloadChainWithRoot);
+                break;
+            case CertificateDownloadKind.RootPem:
+                ViewModel?.DownloadRootCRT(certificate.Id);
+                break;
+            case CertificateDownloadKind.RootDer:
+                ViewModel?.DownloadRootDER(certificate.Id);
+                break;
+            case CertificateDownloadKind.IntermediatePem:
+                ViewModel?.DownloadIntermediateCRT(certificate.Id);
+                break;
+            case CertificateDownloadKind.PrivateKeyPem:
+                ViewModel?.DownloadPrivateKeyPEM(certificate.Id);
+                break;
+            case CertificateDownloadKind.RootThumbprint:
+                await ShowThumbprint(certificate.RootThumbPrint);
+                break;
+        }
+    }
+
     private static string GetSolutionName(Certificate certificate)
     {
         return string.IsNullOrWhiteSpace(certificate.Solution)
@@ -218,6 +319,75 @@
         return $"Certificate {certificate.Id}";
     }
 
+    private static string GetIssuerGroupKey(Certificate certificate)
+    {
+        if(!string.IsNullOrWhiteSpace(certificate.IssuerAuthorityId))
+        {
+            return $"authority:{certificate.IssuerAuthorityId.Trim()}";
+        }
+
+        if(!string.IsNullOrWhiteSpace(certificate.IssuerThumbPrint))
+        {
+            return $"thumbprint:{certificate.IssuerThumbPrint.Trim()}";
+        }
+
+        return "issuer:unknown";
+    }
+
+    private static string GetIssuerDisplayName(Certificate certificate, IReadOnlyDictionary<string, CertificateAuthorityInfo> authorityLookup)
+    {
+        if(!string.IsNullOrWhiteSpace(certificate.IssuerAuthorityId)
+            && authorityLookup.TryGetValue(certificate.IssuerAuthorityId, out var authority))
+        {
+            return string.IsNullOrWhiteSpace(authority.Name)
+                ? Display(authority.Subject)
+                : authority.Name;
+        }
+
+        if(!string.IsNullOrWhiteSpace(certificate.IssuerAuthorityId))
+        {
+            return certificate.IssuerAuthorityId;
+        }
+
+        if(!string.IsNullOrWhiteSpace(certificate.IssuerThumbPrint))
+        {
+            return $"Issuer {ShortThumbprint(certificate.IssuerThumbPrint)}";
+        }
+
+        return "Issuer not recorded";
+    }
+
+    private static string GetIssuerGroupSubtitle(Certificate certificate, IReadOnlyDictionary<string, CertificateAuthorityInfo> authorityLookup)
+    {
+        if(!string.IsNullOrWhiteSpace(certificate.IssuerAuthorityId)
+            && authorityLookup.TryGetValue(certificate.IssuerAuthorityId, out var authority))
+        {
+            var role = string.IsNullOrWhiteSpace(authority.Role) ? "Issuer" : authority.Role;
+            var thumbprint = ShortThumbprint(authority.Thumbprint);
+            return string.IsNullOrWhiteSpace(thumbprint) ? role : $"{role} - {thumbprint}";
+        }
+
+        if(!string.IsNullOrWhiteSpace(certificate.IssuerThumbPrint))
+        {
+            return ShortThumbprint(certificate.IssuerThumbPrint);
+        }
+
+        return "Legacy certificate";
+    }
+
+    private static string ShortThumbprint(string? thumbprint)
+    {
+        if(string.IsNullOrWhiteSpace(thumbprint))
+        {
+            return string.Empty;
+        }
+
+        var normalized = thumbprint.Replace(" ", string.Empty).Trim();
+        return normalized.Length <= 12
+            ? normalized
+            : $"{normalized[..6]}...{normalized[^6..]}";
+    }
+
     private static string Display(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "-" : value;
@@ -238,4 +408,18 @@
     }
 
     private sealed record SolutionSummary(string Name, int Count, DateTime LastCreated);
+    private sealed record IssuerCertificateGroup(string Key, string Name, string Subtitle, List<Certificate> Certificates);
+
+    private enum CertificateDownloadKind
+    {
+        Pfx,
+        CertificatePem,
+        CertificateDer,
+        ChainPem,
+        RootPem,
+        RootDer,
+        IntermediatePem,
+        PrivateKeyPem,
+        RootThumbprint
+    }
 }

@@ -35,15 +35,17 @@ namespace CertificateCommon
         public Int32 LastSerialNumber { get; private set; }
         string _dir { get; init; } = "Output";
         public FileManagerCertificate? FileManager { get; init; }
+        public ICertificateAuthorityRepository CertificateAuthorities { get; init; }
         private IReadOnlyList<CertificateStoreSearchLocation> CertificateAuthorityStores { get; init; } = DefaultCertificateAuthorityStores;
 
-        public CertificationManager(IConfiguration configuration, Serilog.ILogger logger, FileManagerCertificate fileManager)
+        public CertificationManager(IConfiguration configuration, Serilog.ILogger logger, FileManagerCertificate fileManager, ICertificateAuthorityRepository certificateAuthorities)
         {
             Logger = logger;
             var certificationManagerSection = configuration.GetSection("CertificationManager");
             CARootThumbprint = certificationManagerSection.GetSection("CARootThumbPrint").Value;
             CertificateAuthorityStores = ReadCertificateAuthorityStores(certificationManagerSection);
-            CARoot = ResolveCertificateAuthority(CARootThumbprint);
+            CertificateAuthorities = certificateAuthorities;
+            CARoot = CertificateAuthorities.GetDefaultIssuer()?.Certificate ?? ResolveCertificateAuthority(CARootThumbprint);
             var outputOptions = CertificateOutputOptions.FromConfiguration(configuration);
             var outputData = outputOptions.PrimaryOutput;
             LastSerialNumber = 0;
@@ -58,7 +60,32 @@ namespace CertificateCommon
         public CertificationManager(string caRootThumbprint, int lastSerialNumber)
         {
             CARootThumbprint = caRootThumbprint;
+            CertificateAuthorities = new CertificateAuthorityRepository([]);
             CARoot = ResolveCertificateAuthority(CARootThumbprint);
+            LastSerialNumber = lastSerialNumber;
+        }
+
+        protected CertificationManager(X509Certificate2 issuer, int lastSerialNumber = 0)
+        {
+            CARootThumbprint = issuer.Thumbprint;
+            var entry = new CertificateAuthorityEntry
+            {
+                Id = NormalizeThumbprint(issuer.Thumbprint),
+                Name = issuer.GetNameInfo(X509NameType.SimpleName, false),
+                Role = CertificateAuthorityRole.Root,
+                IsDefault = true,
+                Certificate = issuer
+            };
+            CertificateAuthorities = new CertificateAuthorityRepository([entry], entry.Id, entry.Id);
+            CARoot = issuer;
+            LastSerialNumber = lastSerialNumber;
+        }
+
+        protected CertificationManager(IEnumerable<CertificateAuthorityEntry> authorities, string defaultIssuerId, string defaultRootId, int lastSerialNumber = 0)
+        {
+            CertificateAuthorities = new CertificateAuthorityRepository(authorities, defaultIssuerId, defaultRootId);
+            CARoot = CertificateAuthorities.GetDefaultIssuer()?.Certificate;
+            CARootThumbprint = CertificateAuthorities.GetDefaultRoot()?.Certificate.Thumbprint;
             LastSerialNumber = lastSerialNumber;
         }
 
@@ -133,33 +160,112 @@ namespace CertificateCommon
 
         public CertificateAuthorityInfo GetCertificateAuthorityInfo()
         {
+            var authority = CertificateAuthorities.GetDefaultIssuer();
+            if(authority is not null)
+            {
+                return CreateCertificateAuthorityInfo(authority);
+            }
+
             if(CARoot is null)
             {
                 throw new CARootNotFoundException();
             }
 
+            return CreateCertificateAuthorityInfo(CARoot, null, null, CertificateAuthorityRole.Root, true, true, null);
+        }
+
+        public IReadOnlyList<CertificateAuthorityInfo> GetCertificateAuthoritiesInfo()
+        {
+            var authorities = CertificateAuthorities.GetAuthorities()
+                .Select(CreateCertificateAuthorityInfo)
+                .ToArray();
+
+            if(CARoot is null)
+            {
+                return authorities;
+            }
+
+            var rootThumbprint = NormalizeThumbprint(CARoot.Thumbprint);
+            if(authorities.Any(authority => string.Equals(NormalizeThumbprint(authority.Thumbprint), rootThumbprint, StringComparison.OrdinalIgnoreCase)))
+            {
+                return authorities;
+            }
+
+            return authorities
+                .Append(CreateCertificateAuthorityInfo(
+                    CARoot,
+                    rootThumbprint,
+                    CARoot.GetNameInfo(X509NameType.SimpleName, false),
+                    CertificateAuthorityRole.Root,
+                    isDefault: true,
+                    isIssuer: CARoot.HasPrivateKey,
+                    source: "Configured CA Root"))
+                .ToArray();
+        }
+
+        public CertificateAuthorityInfo GetCertificateAuthorityInfo(string authorityId)
+        {
+            var authority = CertificateAuthorities.GetById(authorityId);
+            if(authority is null)
+            {
+                throw new CARootNotFoundException();
+            }
+
+            return CreateCertificateAuthorityInfo(authority);
+        }
+
+        private CertificateAuthorityInfo CreateCertificateAuthorityInfo(CertificateAuthorityEntry authority)
+        {
+            return CreateCertificateAuthorityInfo(
+                authority.Certificate,
+                authority.Id,
+                authority.Name,
+                authority.Role,
+                authority.IsDefault,
+                authority.Certificate.HasPrivateKey,
+                authority.Source,
+                authority.ParentId);
+        }
+
+        private CertificateAuthorityInfo CreateCertificateAuthorityInfo(
+            X509Certificate2 certificate,
+            string? id,
+            string? name,
+            CertificateAuthorityRole role,
+            bool isDefault,
+            bool isIssuer,
+            string? source,
+            string? parentId = null)
+        {
             var now = DateTime.UtcNow;
-            var notAfterUtc = CARoot.NotAfter.ToUniversalTime();
+            var notAfterUtc = certificate.NotAfter.ToUniversalTime();
 
             return new CertificateAuthorityInfo
             {
+                Id = id,
+                Name = name,
+                ParentId = parentId,
+                Role = role.ToString(),
+                IsDefault = isDefault,
+                IsIssuer = isIssuer,
+                Source = source,
                 ConfiguredThumbprint = CARootThumbprint,
-                Subject = CARoot.Subject,
-                Issuer = CARoot.Issuer,
-                Thumbprint = CARoot.Thumbprint,
-                SerialNumber = CARoot.SerialNumber,
-                NotBefore = CARoot.NotBefore,
-                NotAfter = CARoot.NotAfter,
+                Subject = certificate.Subject,
+                Issuer = certificate.Issuer,
+                Thumbprint = certificate.Thumbprint,
+                SerialNumber = certificate.SerialNumber,
+                NotBefore = certificate.NotBefore,
+                NotAfter = certificate.NotAfter,
                 DaysToExpiration = (int)Math.Floor((notAfterUtc - now).TotalDays),
                 IsExpired = notAfterUtc <= now,
-                HasPrivateKey = CARoot.HasPrivateKey,
-                IsCertificateAuthority = IsCertificateAuthority(CARoot),
-                PublicKeyAlgorithm = CARoot.PublicKey.Oid.FriendlyName ?? CARoot.PublicKey.Oid.Value,
-                PublicKeySize = GetPublicKeySize(CARoot),
-                SignatureAlgorithm = CARoot.SignatureAlgorithm.FriendlyName ?? CARoot.SignatureAlgorithm.Value,
-                Version = CARoot.Version,
-                KeyUsages = GetKeyUsageNames(CARoot),
-                EnhancedKeyUsages = GetEnhancedKeyUsageNames(CARoot)
+                HasPrivateKey = certificate.HasPrivateKey,
+                IsCertificateAuthority = IsCertificateAuthority(certificate),
+                PublicKeyAlgorithm = certificate.PublicKey.Oid.FriendlyName ?? certificate.PublicKey.Oid.Value,
+                PublicKeySize = GetPublicKeySize(certificate),
+                SignatureAlgorithm = certificate.SignatureAlgorithm.FriendlyName ?? certificate.SignatureAlgorithm.Value,
+                Version = certificate.Version,
+                KeyUsages = GetKeyUsageNames(certificate),
+                EnhancedKeyUsages = GetEnhancedKeyUsageNames(certificate)
             };
         }
         public virtual async Task<byte[]?> ConvertIFormFileToByteArrayAsync(IFormFile file)
@@ -443,7 +549,7 @@ namespace CertificateCommon
             }
         }
 
-        public List<CertficateFileInfo> CreatingPFX_CRT(CertificateGenerationRequest request, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt")
+        public List<CertficateFileInfo> CreatingPFX_CRT(CertificateGenerationRequest request, string? pfxName = "Certificate.pfx", string? certName = "Certificate.crt", bool isCertificateAuthority = false)
         {
             var validationErrors = request.Validate();
             if(validationErrors.Count > 0)
@@ -452,15 +558,36 @@ namespace CertificateCommon
             }
 
             List<CertficateFileInfo> fileInfo = new List<CertficateFileInfo>();
-            if(CARoot is null)
+            var issuerAuthority = CertificateAuthorities.GetIssuer(request.IssuerAuthorityId);
+            if(issuerAuthority is null && CARoot is not null)
+            {
+                issuerAuthority = new CertificateAuthorityEntry
+                {
+                    Id = NormalizeThumbprint(CARoot.Thumbprint),
+                    Name = CARoot.GetNameInfo(X509NameType.SimpleName, false),
+                    Role = CertificateAuthorityRole.Root,
+                    IsDefault = true,
+                    Certificate = CARoot
+                };
+            }
+
+            if(issuerAuthority is null)
             {
                 throw new CARootNotFoundException();
             }
 
-            var resolvedKeyAlgorithm = ResolvePrivateKeyAlgorithm(request.KeyAlgorithm, CARoot);
+            var issuer = issuerAuthority.Certificate;
+            var rootAuthority = CertificateAuthorities.GetRootFor(issuerAuthority) ?? issuerAuthority;
+            var root = rootAuthority.Certificate;
+            var hasIntermediate = !string.Equals(
+                NormalizeThumbprint(root.Thumbprint),
+                NormalizeThumbprint(issuer.Thumbprint),
+                StringComparison.OrdinalIgnoreCase);
+
+            var resolvedKeyAlgorithm = ResolvePrivateKeyAlgorithm(request.KeyAlgorithm, issuer);
             using var serverKey = CreatePrivateKey(resolvedKeyAlgorithm);
 
-            X509Certificate2? x509Son = CreateCertificate(request, serverKey, CARoot, isCertificateAuthority: false);
+            X509Certificate2? x509Son = CreateCertificate(request, serverKey, issuer, isCertificateAuthority);
 
             if(x509Son is null)
             {
@@ -487,42 +614,82 @@ namespace CertificateCommon
                 {
                     var pfxPassword = request.PfxPassword ?? string.Empty;
                     string pfxFileName = Path.Join(path, pfxName);
-                    File.WriteAllBytes(pfxFileName, serverPfx.Export(X509ContentType.Pfx, pfxPassword));
+                    var pfxCollection = new X509Certificate2Collection { serverPfx };
+                    if(hasIntermediate)
+                    {
+                        pfxCollection.Add(CopyWithoutPrivateKey(issuer));
+                    }
+                    pfxCollection.Add(CopyWithoutPrivateKey(root));
+                    File.WriteAllBytes(pfxFileName, pfxCollection.Export(X509ContentType.Pfx, pfxPassword) ?? []);
                     fileInfo.Add(new CertficateFileInfo(pfxFileName, x509Son, resolvedKeyAlgorithm.ToString(), request.ApplicationUri));
+
+                    if(isCertificateAuthority)
+                    {
+                        var trustedIntermediatePath = CertificateAuthorities.SaveIntermediate(
+                            serverPfx,
+                            rootAuthority.Id,
+                            string.IsNullOrWhiteSpace(request.Name) ? request.CommonName : request.Name,
+                            pfxPassword);
+                        Logger?.Information("Intermediate authority trusted at {Path}", trustedIntermediatePath ?? "runtime memory");
+                    }
 
                     string certFileName = Path.Join(path, certName);
 
                     //File.WriteAllBytes(certFileName, x509Son.Export(X509ContentType.Cert));//questa per CER
                     File.WriteAllText(certFileName, x509Son.ExportCertificatePem());//questa per CER
                     fileInfo.Add(new CertficateFileInfo(certFileName, x509Son, resolvedKeyAlgorithm.ToString(), request.ApplicationUri));
+                    string? intermediateFileName = isCertificateAuthority ? certFileName : null;
 
                     string derFileName = Path.Join(path, "Certificate.der");
                     File.WriteAllBytes(derFileName, x509Son.Export(X509ContentType.Cert));
                     fileInfo.Add(new CertficateFileInfo(derFileName, x509Son, resolvedKeyAlgorithm.ToString(), request.ApplicationUri));
 
+                    string? privateKeyFName = null;
                     if(request.ExportPrivateKeyPem)
                     {
                         string privateKeyPem = ExportPrivateKeyPem(serverKey);
 
-                        string privateKeyFName = Path.Join(path, "private.key");
+                        privateKeyFName = Path.Join(path, "private.key");
 
                         File.WriteAllText(privateKeyFName, privateKeyPem);
+                        fileInfo.Add(new CertficateFileInfo(privateKeyFName, x509Son, resolvedKeyAlgorithm.ToString(), request.ApplicationUri));
                         Logger?.Information("Private key generated: 'private.key'");
                     }
 
                     string certFileNameRoot = Path.Join(path, "Root.crt");
-                    fileInfo.Add(ExtractRoot(certFileNameRoot));
+                    File.WriteAllText(certFileNameRoot, root.ExportCertificatePem());
+                    fileInfo.Add(new CertficateFileInfo(certFileNameRoot, root));
+
+                    if(hasIntermediate && !isCertificateAuthority)
+                    {
+                        intermediateFileName = Path.Join(path, "Intermediate.crt");
+                        File.WriteAllText(intermediateFileName, issuer.ExportCertificatePem());
+                        fileInfo.Add(new CertficateFileInfo(intermediateFileName, issuer));
+                    }
+
+                    string chainFileName = Path.Join(path, "Certificate-chain.crt");
+                    var chainPem = new StringBuilder();
+                    chainPem.AppendLine(x509Son.ExportCertificatePem().TrimEnd());
+                    if(hasIntermediate)
+                    {
+                        chainPem.AppendLine(issuer.ExportCertificatePem().TrimEnd());
+                    }
+                    chainPem.AppendLine(root.ExportCertificatePem().TrimEnd());
+                    File.WriteAllText(chainFileName, chainPem.ToString());
+                    fileInfo.Add(new CertficateFileInfo(chainFileName, x509Son, resolvedKeyAlgorithm.ToString(), request.ApplicationUri));
 
                     string derFileNameRoot = Path.Join(path, "Root.der");
-                    File.WriteAllBytes(derFileNameRoot, CARoot.Export(X509ContentType.Cert));
-                    fileInfo.Add(new CertficateFileInfo(derFileNameRoot, CARoot));
+                    File.WriteAllBytes(derFileNameRoot, root.Export(X509ContentType.Cert));
+                    fileInfo.Add(new CertficateFileInfo(derFileNameRoot, root));
 
                     FileManager?.Add(commonName: request.CommonName!, company: request.Organization!, oid: string.Join(",", request.EnhancedKeyUsages),
                         pfxFile: pfxFileName, crtRoot: certFileNameRoot, derFile: derFileName, rootDerFile: derFileNameRoot, solution: request.Solution!,
-                        name: certificateName, password: pfxPassword, rootThumbprint: CARoot.Thumbprint, address: GetPrimaryEndpoint(request), applicationUri: request.ApplicationUri, dns: request.DnsNames,
+                        name: certificateName, password: pfxPassword, rootThumbprint: root.Thumbprint, rootAuthorityId: rootAuthority.Id,
+                        issuerAuthorityId: issuerAuthority.Id, issuerThumbprint: issuer.Thumbprint, certificatePem: certFileName, intermediateCertificate: intermediateFileName,
+                        certificateChain: chainFileName, address: GetPrimaryEndpoint(request), applicationUri: request.ApplicationUri, dns: request.DnsNames,
                         ipAddresses: request.IpAddresses, organizationalUnit: request.OrganizationalUnit, locality: request.Locality, state: request.State,
                         country: request.Country, validFromUtc: request.ValidFromUtc, validToUtc: request.ValidToUtc, keyUsages: request.KeyUsages, keyAlgorithm: resolvedKeyAlgorithm.ToString(),
-                        signatureHashAlgorithm: request.SignatureHashAlgorithm);
+                        signatureHashAlgorithm: request.SignatureHashAlgorithm, privateKeyPem: privateKeyFName);
 
                 }
                 catch(Exception ex)
@@ -857,6 +1024,11 @@ namespace CertificateCommon
                 RSA rsa => certificate.CopyWithPrivateKey(rsa),
                 _ => throw new ArgumentException("Unsupported private key algorithm.", nameof(privateKey))
             };
+        }
+
+        private static X509Certificate2 CopyWithoutPrivateKey(X509Certificate2 certificate)
+        {
+            return new X509Certificate2(certificate.Export(X509ContentType.Cert));
         }
 
         private static string ExportPrivateKeyPem(AsymmetricAlgorithm privateKey)

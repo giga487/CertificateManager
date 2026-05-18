@@ -22,6 +22,7 @@ namespace CertificateManager.Client.src.Models
         }
 
         public CertificateAuthorityInfo? Info { get; private set; }
+        public List<CertificateAuthorityInfo> Authorities { get; private set; } = [];
         public bool IsLoading { get; private set; } = true;
         public string? ErrorMessage { get; private set; }
 
@@ -33,8 +34,10 @@ namespace CertificateManager.Client.src.Models
 
             try
             {
-                Info = await _factory.GetAsync<CertificateAuthorityInfo>("api/Certificate/CARootInfo");
-                if(Info is null)
+                Authorities = await _factory.GetAsync<List<CertificateAuthorityInfo>>("api/Certificate/CARoots") ?? [];
+                Info = Authorities.FirstOrDefault(authority => authority.IsDefault)
+                    ?? Authorities.FirstOrDefault();
+                if(Authorities.Count == 0)
                 {
                     ErrorMessage = "CA Root not found or not configured.";
                 }
@@ -54,6 +57,14 @@ namespace CertificateManager.Client.src.Models
         public async Task Download()
         {
             await _factory.Download("api/Certificate/downloadCARoot", _jsRuntime, "CA-Root-");
+        }
+
+        public async Task Download(string? authorityId)
+        {
+            var query = string.IsNullOrWhiteSpace(authorityId)
+                ? "api/Certificate/downloadCARoot"
+                : $"api/Certificate/downloadCARoot?authorityId={Uri.EscapeDataString(authorityId)}";
+            await _factory.Download(query, _jsRuntime, "CA-");
         }
 
         public ValueTask DisposeAsync()

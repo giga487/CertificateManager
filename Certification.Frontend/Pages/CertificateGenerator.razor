@@ -3,6 +3,7 @@
 @using CertificateManager.src
 @using CertificateManager.Client.src.Models
 @inject IJSRuntime JSRuntime
+@inject IConfiguration Configuration
 
 @inherits Page<CreateForCertificateMV>
 
@@ -30,6 +31,16 @@
 
     <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
         <FluentTextArea Style="width:30%" Rows="1" @bind-Value=ApplicationUri>Application URI</FluentTextArea>
+    </FluentStack>
+
+    <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 1rem;">
+        <FluentLabel Weight="FontWeight.Bold">Issuer CA</FluentLabel>
+        <select class="oid-filter-input" value="@SelectedIssuerAuthorityId" @onchange="OnIssuerAuthorityChanged">
+            @foreach(var authority in IssuerAuthorities)
+            {
+                <option value="@authority.Id">@FormatAuthority(authority)</option>
+            }
+        </select>
     </FluentStack>
 
     <FluentStack HorizontalGap="10" HorizontalAlignment="HorizontalAlignment.Stretch">
@@ -154,10 +165,13 @@
             <FluentStack xs="12"><FluentLabel>@IDString</FluentLabel></FluentStack>
 
             <FluentStack xs="12">
-                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(ViewModel.CreatedCRTId, Solution))">PFX del certificato</FluentButton>
-                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadRootCRT(ViewModel.CreatedCRTId, Solution))">Root CRT</FluentButton>
-                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadRootDER(ViewModel.CreatedCRTId, Solution))">Root DER</FluentButton>
-                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(ViewModel.CreatedCRTId, Solution))">Certificato DER</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPFX(ViewModel.CreatedCRTId, DownloadPrefix))">PFX del certificato</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadRootCRT(ViewModel.CreatedCRTId, DownloadPrefix))">Root CRT</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadRootDER(ViewModel.CreatedCRTId, DownloadPrefix))">Root DER</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadCertificatePEM(ViewModel.CreatedCRTId, DownloadPrefix))">Certificato PEM</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadChainCRT(ViewModel.CreatedCRTId, DownloadPrefix))">Catena CRT</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadDER(ViewModel.CreatedCRTId, DownloadPrefix))">Certificato DER</FluentButton>
+                <FluentButton Color="Color.Accent" OnClick="(() => ViewModel?.DownloadPrivateKeyPEM(ViewModel.CreatedCRTId, DownloadPrefix))">Chiave PEM</FluentButton>
             </FluentStack>
 
             <FluentStack>
@@ -182,20 +196,25 @@
     [Parameter]
     public int ID { get; set; } = -1;
 
-    string Solution { get; set; } = "APP_X";
+    string Solution { get; set; } = "";
     string Name { get; set; } = ""; // Human-friendly name for certificate organization
-    string Company { get; set; } = "NXT";
+    string DownloadPrefix => string.IsNullOrWhiteSpace(Name) ? Solution : Name;
+    string Company { get; set; } = "";
     string OrganizationalUnit { get; set; } = "";
-    string Locality { get; set; } = "Pisa";
-    string State { get; set; } = "PI";
-    string Country { get; set; } = "IT";
-    string CommonName { get; set; } = "server";
-    string Password { get; set; } = "secret";
-    bool UsePfxPassword { get; set; } = true;
-    string ApplicationUri { get; set; } = "urn:localhost:NXT:server";
+    string Locality { get; set; } = "";
+    string State { get; set; } = "";
+    string Country { get; set; } = "";
+    string CommonName { get; set; } = "";
+    string Password { get; set; } = "";
+    bool UsePfxPassword { get; set; }
+    string ApplicationUri { get; set; } = "";
     DateTime? ValidFrom { get; set; } = DateTime.UtcNow.Date;
     DateTime? ValidTo { get; set; } = DateTime.UtcNow.Date.AddYears(10);
     CertificatePrivateKeyAlgorithm KeyAlgorithm { get; set; } = CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot;
+    List<CertificateAuthorityInfo> CertificateAuthorities { get; set; } = [];
+    string? SelectedIssuerAuthorityId { get; set; }
+    IEnumerable<CertificateAuthorityInfo> IssuerAuthorities => CertificateAuthorities.Where(authority => authority.IsIssuer && authority.HasPrivateKey);
+    CertificateAuthorityInfo? SelectedIssuerAuthority => IssuerAuthorities.FirstOrDefault(authority => string.Equals(authority.Id, SelectedIssuerAuthorityId, StringComparison.OrdinalIgnoreCase));
 
     string MakeOutput { get; set; } = "";
 
@@ -676,6 +695,22 @@
         };
     }
 
+    private static string FormatAuthority(CertificateAuthorityInfo authority)
+    {
+        var name = string.IsNullOrWhiteSpace(authority.Name)
+            ? authority.Subject ?? authority.Thumbprint ?? "CA"
+            : authority.Name;
+        var role = string.IsNullOrWhiteSpace(authority.Role) ? "CA" : authority.Role;
+        var algorithm = FormatKeyAlgorithmSummary(authority.PublicKeyAlgorithm, authority.PublicKeySize, authority.SignatureAlgorithm);
+        return $"{name} - {role} - {algorithm}";
+    }
+
+    private static string FormatKeyAlgorithmSummary(string? publicKeyAlgorithm, int? publicKeySize, string? signatureAlgorithm)
+    {
+        var key = publicKeySize is null ? publicKeyAlgorithm : $"{publicKeyAlgorithm} {publicKeySize}";
+        return string.Join(" / ", new[] { key, signatureAlgorithm }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
     private void SetKeyUsageCheckboxes(string[]? keyUsages)
     {
         KeyUsageDigitalSignature = false;
@@ -722,8 +757,11 @@
     protected async override Task OnInitializedAsync()
     {
         // await JSRuntime.InvokeVoidAsync("mostraAlert", "Ciao da Blazor C#!");
-        DNSStrings  = new List<string>() { "" };
-        IPStrings  = new List<string>() { "" };
+        ApplyCertificateDefaults(CertificateDefaultsOptions.FromConfiguration(Configuration).Certificate);
+        CertificateAuthorities = await ViewModel.GetCertificateAuthorities();
+        SelectedIssuerAuthorityId = IssuerAuthorities.FirstOrDefault(authority => authority.IsDefault)?.Id
+            ?? IssuerAuthorities.FirstOrDefault()?.Id;
+        ApplyIssuerValidityDefaults(forceDefaultTo: true);
 
         if(ID != -1)
         {
@@ -742,12 +780,14 @@
             Company = cert.Company ?? "";
             ApplicationUri = cert.ApplicationUri ?? "";
             OrganizationalUnit = cert.OrganizationalUnit ?? "";
-            Locality = cert.Locality ?? "Pisa";
-            State = cert.State ?? "PI";
-            Country = cert.Country ?? "IT";
+            Locality = cert.Locality ?? Locality;
+            State = cert.State ?? State;
+            Country = cert.Country ?? Country;
             ValidFrom = (cert.ValidFromUtc ?? DateTimeOffset.UtcNow).UtcDateTime.Date;
             ValidTo = (cert.ValidToUtc ?? DateTimeOffset.UtcNow.AddYears(10)).UtcDateTime.Date;
             KeyAlgorithm = ParseKeyAlgorithm(cert.KeyAlgorithm);
+            SelectedIssuerAuthorityId = cert.IssuerAuthorityId ?? SelectedIssuerAuthorityId;
+            ApplyIssuerValidityDefaults(forceDefaultTo: false);
 
             // Set OID checkboxes from certificate
             SetOidCheckboxes(cert.Oid);
@@ -775,12 +815,45 @@
         StateHasChanged();
     }
 
+    private void ApplyCertificateDefaults(CertificateFormDefaults defaults)
+    {
+        Solution = defaults.Solution;
+        Name = defaults.Name;
+        CommonName = defaults.CommonName;
+        Company = defaults.Organization;
+        OrganizationalUnit = defaults.OrganizationalUnit;
+        Locality = defaults.Locality;
+        State = defaults.State;
+        Country = defaults.Country;
+        Password = defaults.PfxPassword;
+        UsePfxPassword = defaults.UsePfxPassword;
+        ApplicationUri = defaults.ApplicationUri;
+        ValidFrom = DateTime.UtcNow.Date;
+        ValidTo = DateTime.UtcNow.Date.AddYears(defaults.ValidityYears);
+        KeyAlgorithm = defaults.KeyAlgorithm;
+        DNSStrings = defaults.DnsNames.Length == 0 ? [""] : defaults.DnsNames.ToList();
+        IPStrings = defaults.IpAddresses.Length == 0 ? [""] : defaults.IpAddresses.ToList();
+        SetKeyUsageCheckboxes(defaults.KeyUsages);
+        SetOidCheckboxes(string.Join(",", defaults.EnhancedKeyUsages.Select(MapEnhancedKeyUsage)));
+    }
+
+    private string MapEnhancedKeyUsage(string value)
+    {
+        return OidMapping.TryGetValue(value, out var oid) ? oid : value;
+    }
+
     public async void MakeCrt()
     {
         var oid = GetSelectedOids();
         if(ValidFrom is null || ValidTo is null)
         {
             await JSRuntime.InvokeVoidAsync("showAlert", "Certificate validity dates are not valid");
+            return;
+        }
+
+        if(!ValidateIssuerValidity(out var validityError))
+        {
+            await JSRuntime.InvokeVoidAsync("showAlert", validityError);
             return;
         }
 
@@ -805,6 +878,7 @@
             EnhancedKeyUsages = oid.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             ValidFromUtc = validFromUtc,
             ValidToUtc = validToUtc,
+            IssuerAuthorityId = SelectedIssuerAuthorityId,
             KeyAlgorithm = this.KeyAlgorithm,
             SignatureHashAlgorithm = "AutoFromIssuerRoot",
             ExportPrivateKeyPem = true
@@ -829,6 +903,68 @@
         IDString = $"Created the {ViewModel.CreatedCRTId} crt";
         ViewModel.OnStateChange("Update the output");
 
+    }
+
+    private void OnIssuerAuthorityChanged(ChangeEventArgs args)
+    {
+        SelectedIssuerAuthorityId = args.Value?.ToString();
+        ApplyIssuerValidityDefaults(forceDefaultTo: true);
+    }
+
+    private void ApplyIssuerValidityDefaults(bool forceDefaultTo)
+    {
+        var issuer = SelectedIssuerAuthority;
+        if(issuer is null)
+        {
+            return;
+        }
+
+        var issuerStart = issuer.NotBefore.ToUniversalTime().Date;
+        var issuerEnd = issuer.NotAfter.ToUniversalTime().Date;
+        var today = DateTime.UtcNow.Date;
+
+        if(ValidFrom is null || ValidFrom.Value.Date < issuerStart)
+        {
+            ValidFrom = issuerStart > today ? issuerStart : today;
+        }
+
+        if(forceDefaultTo || ValidTo is null || ValidTo.Value.Date > issuerEnd)
+        {
+            var preferredEnd = ValidFrom.Value.Date.AddYears(10);
+            ValidTo = preferredEnd <= issuerEnd ? preferredEnd : issuerEnd;
+        }
+
+        if(ValidTo.Value.Date <= ValidFrom.Value.Date && issuerEnd > ValidFrom.Value.Date)
+        {
+            ValidTo = issuerEnd;
+        }
+    }
+
+    private bool ValidateIssuerValidity(out string error)
+    {
+        error = string.Empty;
+        var issuer = SelectedIssuerAuthority;
+        if(issuer is null || ValidFrom is null || ValidTo is null)
+        {
+            return true;
+        }
+
+        var issuerStart = issuer.NotBefore.ToUniversalTime().Date;
+        var issuerEnd = issuer.NotAfter.ToUniversalTime().Date;
+
+        if(ValidFrom.Value.Date < issuerStart || ValidTo.Value.Date > issuerEnd)
+        {
+            error = $"Certificate validity must stay within issuer validity: {issuerStart:yyyy-MM-dd} - {issuerEnd:yyyy-MM-dd}.";
+            return false;
+        }
+
+        if(ValidTo.Value.Date <= ValidFrom.Value.Date)
+        {
+            error = "Valid To UTC must be after Valid From UTC.";
+            return false;
+        }
+
+        return true;
     }
 
 }

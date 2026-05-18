@@ -55,6 +55,7 @@ namespace CertificateManager.Client.src.Models
             }
         }
         public CertificateDB? Certificates { get; private set; } = null;
+        public List<CertificateAuthorityInfo> CertificateAuthorities { get; private set; } = [];
         public bool IsLoading { get; private set; } = true;
 
         Task? _pollingTask;
@@ -67,8 +68,10 @@ namespace CertificateManager.Client.src.Models
                     while(!_source?.Token.IsCancellationRequested ?? true)
                     {
                         var result = await _factory?.GetAsync<CertificateDB>("api/Certificate/info");
+                        var authorities = await _factory?.GetAsync<List<CertificateAuthorityInfo>>("api/Certificate/CARoots");
 
                         Certificates = result;
+                        CertificateAuthorities = authorities ?? [];
                         IsLoading = false;
                         OnStateChange("Info received");
 
@@ -106,7 +109,7 @@ namespace CertificateManager.Client.src.Models
             _source?.Dispose();
         }
 
-        public async void DownloadPFX(int? id)
+        public async void DownloadPFX(int? id, bool includeIntermediates = true, bool includeRoot = false)
         {
             _logger?.Information($"PFX: {id}");
 
@@ -114,7 +117,8 @@ namespace CertificateManager.Client.src.Models
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadPFX?id={id}", runtime: _jsRuntime, prefix: found.Solution, fallbackFileName: "Certificate.pfx");
+                    var query = $"api/Certificate/downloadPFX?id={id}&includeIntermediates={includeIntermediates.ToString().ToLowerInvariant()}&includeRoot={includeRoot.ToString().ToLowerInvariant()}";
+                    await _factory?.Download(query, runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: includeIntermediates || includeRoot ? "Certificate-with-chain.pfx" : "Certificate.pfx");
                 }
 
 
@@ -138,7 +142,7 @@ namespace CertificateManager.Client.src.Models
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime, prefix: found.Solution, fallbackFileName: "Root.crt");
+                    await _factory?.Download($"api/Certificate/downloadCRT?id={id}", runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: "Root.crt");
                 }
             }
             catch(OperationCanceledException ex)
@@ -154,7 +158,7 @@ namespace CertificateManager.Client.src.Models
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadRootDER?id={id}", runtime: _jsRuntime, prefix: found.Solution, fallbackFileName: "Root.der");
+                    await _factory?.Download($"api/Certificate/downloadRootDER?id={id}", runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: "Root.der");
                 }
             }
             catch(OperationCanceledException ex)
@@ -170,13 +174,91 @@ namespace CertificateManager.Client.src.Models
             {
                 if(Certificates?.Get(id ?? 0, out var found) ?? false)
                 {
-                    await _factory?.Download($"api/Certificate/downloadDER?id={id}", runtime: _jsRuntime, prefix: found.Solution, fallbackFileName: "Certificate.der");
+                    await _factory?.Download($"api/Certificate/downloadDER?id={id}", runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: "Certificate.der");
                 }
             }
             catch(OperationCanceledException ex)
             {
 
             }
+        }
+
+        public async void DownloadCertificatePEM(int? id, bool includeIntermediates = false, bool includeRoot = false)
+        {
+            _logger?.Information($"Certificate PEM: {id}");
+            try
+            {
+                if(Certificates?.Get(id ?? 0, out var found) ?? false)
+                {
+                    var query = $"api/Certificate/downloadCertificatePEM?id={id}&includeIntermediates={includeIntermediates.ToString().ToLowerInvariant()}&includeRoot={includeRoot.ToString().ToLowerInvariant()}";
+                    await _factory?.Download(query, runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: includeIntermediates || includeRoot ? "Certificate-with-chain.crt" : "Certificate.crt");
+                }
+            }
+            catch(OperationCanceledException ex)
+            {
+
+            }
+        }
+
+        public async void DownloadChainCRT(int? id, bool includeLeaf = true, bool includeIntermediates = true, bool includeRoot = false)
+        {
+            _logger?.Information($"Certificate chain CRT: {id}");
+            try
+            {
+                if(Certificates?.Get(id ?? 0, out var found) ?? false)
+                {
+                    var query = $"api/Certificate/downloadChainCRT?id={id}&includeLeaf={includeLeaf.ToString().ToLowerInvariant()}&includeIntermediates={includeIntermediates.ToString().ToLowerInvariant()}&includeRoot={includeRoot.ToString().ToLowerInvariant()}";
+                    await _factory?.Download(query, runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: "Certificate-chain.crt");
+                }
+            }
+            catch(OperationCanceledException ex)
+            {
+
+            }
+        }
+
+        public async void DownloadIntermediateCRT(int? id)
+        {
+            _logger?.Information($"Intermediate CRT: {id}");
+            try
+            {
+                if(Certificates?.Get(id ?? 0, out var found) ?? false)
+                {
+                    await _factory?.Download($"api/Certificate/downloadIntermediateCRT?id={id}", runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: "Intermediate.crt");
+                }
+            }
+            catch(OperationCanceledException ex)
+            {
+
+            }
+        }
+
+        public async void DownloadPrivateKeyPEM(int? id)
+        {
+            _logger?.Information($"Private key PEM: {id}");
+            try
+            {
+                if(Certificates?.Get(id ?? 0, out var found) ?? false)
+                {
+                    await _factory?.Download($"api/Certificate/downloadPrivateKeyPEM?id={id}", runtime: _jsRuntime, prefix: GetDownloadPrefix(found), fallbackFileName: "private.key");
+                }
+            }
+            catch(OperationCanceledException ex)
+            {
+
+            }
+        }
+
+        private static string GetDownloadPrefix(Certificate? certificate)
+        {
+            if(certificate is null)
+            {
+                return string.Empty;
+            }
+
+            return string.IsNullOrWhiteSpace(certificate.Name)
+                ? certificate.Solution ?? string.Empty
+                : certificate.Name;
         }
     }
 }

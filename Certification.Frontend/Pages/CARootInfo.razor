@@ -1,4 +1,5 @@
 @page "/ca-root"
+@using CertificateManager.src
 @using CertificateManager.Client.src.Models
 
 @inherits Page<CARootInfoVM>
@@ -22,9 +23,9 @@
     {
         <FluentMessageBar Intent="MessageIntent.Error">@ViewModel.ErrorMessage</FluentMessageBar>
     }
-    else if(ViewModel?.Info is not null)
+    else if(ViewModel?.Authorities.Count > 0)
     {
-        var info = ViewModel.Info;
+        var info = ViewModel.Info ?? ViewModel.Authorities[0];
 
         <section class="ca-root-summary">
             <div>
@@ -43,6 +44,21 @@
                 <span class="ca-root-label">Algorithm</span>
                 <strong>@FormatAlgorithm(info.PublicKeyAlgorithm, info.PublicKeySize)</strong>
             </div>
+        </section>
+
+        <section class="ca-root-details">
+            @foreach(var authority in ViewModel.Authorities)
+            {
+                <div class="ca-root-row">
+                    <span class="ca-root-label">@FormatAuthorityTitle(authority)</span>
+                    <span>
+                        <strong>@FormatAlgorithm(authority.PublicKeyAlgorithm, authority.PublicKeySize)</strong>
+                        <span> / @authority.SignatureAlgorithm</span>
+                    </span>
+                    <code>@authority.Thumbprint</code>
+                    <FluentButton IconStart="@(new Icons.Regular.Size16.ArrowDownload())" OnClick="@(() => DownloadRoot(authority.Id))">Download</FluentButton>
+                </div>
+            }
         </section>
 
         <section class="ca-root-details">
@@ -83,6 +99,21 @@
         {
             await ViewModel.Download();
         }
+    }
+
+    private async Task DownloadRoot(string? authorityId)
+    {
+        if(ViewModel is not null)
+        {
+            await ViewModel.Download(authorityId);
+        }
+    }
+
+    private static string FormatAuthorityTitle(CertificateAuthorityInfo authority)
+    {
+        var name = string.IsNullOrWhiteSpace(authority.Name) ? authority.Subject ?? "CA" : authority.Name;
+        var role = string.IsNullOrWhiteSpace(authority.Role) ? "CA" : authority.Role;
+        return authority.IsDefault ? $"{name} ({role}, default)" : $"{name} ({role})";
     }
 
     private static string FormatAlgorithm(string? algorithm, int? keySize)

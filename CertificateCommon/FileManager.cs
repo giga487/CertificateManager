@@ -17,6 +17,9 @@ namespace CertificateManager.src
         CRT = 4,
         DER = 5,
         CARootDER = 6,
+        IntermediateNoKey = 7,
+        Chain = 8,
+        PrivateKeyPem = 9,
 
     }
 
@@ -138,13 +141,20 @@ namespace CertificateManager.src
         public string? Solution { get; init; }
         public string? Name { get; init; } // Human-friendly name for certificate organization
         public string? PFXCertificate { get; init; }
+        public string? CertificatePem { get; init; }
         public string? CRTCertificate { get; init; }
         public string? DERCertificate { get; init; }
         public string? RootDERCertificate { get; init; }
+        public string? IntermediateCertificate { get; init; }
+        public string? CertificateChain { get; init; }
+        public string? PrivateKeyPem { get; init; }
         public DateTime Creation { get; init; } = DateTime.Now;
         public DateTimeOffset? ValidFromUtc { get; init; }
         public DateTimeOffset? ValidToUtc { get; init; }
         public string? RootThumbPrint { get; set; } = string.Empty;
+        public string? RootAuthorityId { get; init; }
+        public string? IssuerAuthorityId { get; init; }
+        public string? IssuerThumbPrint { get; init; }
         public string? Address { get; init; }
         public string? ApplicationUri { get; init; }
         public string[]? DNS { get; init; }
@@ -291,6 +301,11 @@ namespace CertificateManager.src
                     files[CertificateTypes.PFX] = dataFound.PFXCertificate;
                 }
 
+                if(!string.IsNullOrEmpty(dataFound.CertificatePem))
+                {
+                    files[CertificateTypes.CRT] = dataFound.CertificatePem;
+                }
+
                 if(!string.IsNullOrEmpty(dataFound.CRTCertificate))
                 {
                     files[CertificateTypes.CARootNoKey] = dataFound.CRTCertificate;
@@ -304,6 +319,21 @@ namespace CertificateManager.src
                 if(!string.IsNullOrEmpty(dataFound.RootDERCertificate))
                 {
                     files[CertificateTypes.CARootDER] = dataFound.RootDERCertificate;
+                }
+
+                if(!string.IsNullOrEmpty(dataFound.IntermediateCertificate))
+                {
+                    files[CertificateTypes.IntermediateNoKey] = dataFound.IntermediateCertificate;
+                }
+
+                if(!string.IsNullOrEmpty(dataFound.CertificateChain))
+                {
+                    files[CertificateTypes.Chain] = dataFound.CertificateChain;
+                }
+
+                if(!string.IsNullOrEmpty(dataFound.PrivateKeyPem))
+                {
+                    files[CertificateTypes.PrivateKeyPem] = dataFound.PrivateKeyPem;
                 }
 
                 return files;
@@ -381,9 +411,13 @@ namespace CertificateManager.src
             return new CertificateComplete
             {
                 CRTCertificate = source.CRTCertificate,
+                CertificatePem = source.CertificatePem,
                 PFXCertificate = source.PFXCertificate,
                 DERCertificate = source.DERCertificate,
                 RootDERCertificate = source.RootDERCertificate,
+                IntermediateCertificate = source.IntermediateCertificate,
+                CertificateChain = source.CertificateChain,
+                PrivateKeyPem = source.PrivateKeyPem,
                 CN = source.CN,
                 Company = source.Company,
                 OrganizationalUnit = source.OrganizationalUnit,
@@ -395,6 +429,9 @@ namespace CertificateManager.src
                 Password = source.Password,
                 Id = id,
                 RootThumbPrint = source.RootThumbPrint,
+                RootAuthorityId = source.RootAuthorityId,
+                IssuerAuthorityId = source.IssuerAuthorityId,
+                IssuerThumbPrint = source.IssuerThumbPrint,
                 Address = source.Address,
                 ApplicationUri = source.ApplicationUri,
                 DNS = source.DNS,
@@ -433,7 +470,14 @@ namespace CertificateManager.src
             DateTimeOffset validToUtc,
             string[] keyUsages,
             string keyAlgorithm,
-            string signatureHashAlgorithm)
+            string signatureHashAlgorithm,
+            string? rootAuthorityId = null,
+            string? issuerAuthorityId = null,
+            string? issuerThumbprint = null,
+            string? certificatePem = null,
+            string? intermediateCertificate = null,
+            string? certificateChain = null,
+            string? privateKeyPem = null)
         {
             _lock.EnterWriteLock();
             try
@@ -441,9 +485,13 @@ namespace CertificateManager.src
                 var crt = new CertificateComplete
                 {
                     CRTCertificate = crtRoot,
+                    CertificatePem = certificatePem,
                     PFXCertificate = pfxFile,
                     DERCertificate = derFile,
                     RootDERCertificate = rootDerFile,
+                    IntermediateCertificate = intermediateCertificate,
+                    CertificateChain = certificateChain,
+                    PrivateKeyPem = privateKeyPem,
                     CN = commonName,
                     Company = company,
                     OrganizationalUnit = organizationalUnit,
@@ -455,6 +503,9 @@ namespace CertificateManager.src
                     Password = password,
                     Id = (_lastJSonMemory?.MaxId ?? 0) + 1,
                     RootThumbPrint = rootThumbprint,
+                    RootAuthorityId = rootAuthorityId,
+                    IssuerAuthorityId = issuerAuthorityId,
+                    IssuerThumbPrint = issuerThumbprint,
                     Address = address,
                     ApplicationUri = applicationUri,
                     DNS = dns,

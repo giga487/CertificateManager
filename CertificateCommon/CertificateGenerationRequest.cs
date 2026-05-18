@@ -30,6 +30,7 @@ namespace CertificateManager.src
         public string[] EnhancedKeyUsages { get; init; } = [];
         public DateTimeOffset ValidFromUtc { get; init; } = DateTimeOffset.UtcNow;
         public DateTimeOffset ValidToUtc { get; init; } = DateTimeOffset.UtcNow.AddYears(10);
+        public string? IssuerAuthorityId { get; init; }
         public CertificatePrivateKeyAlgorithm KeyAlgorithm { get; init; } = CertificatePrivateKeyAlgorithm.AutoFromIssuerRoot;
         public string SignatureHashAlgorithm { get; init; } = "AutoFromIssuerRoot";
         public bool ExportPrivateKeyPem { get; init; } = true;

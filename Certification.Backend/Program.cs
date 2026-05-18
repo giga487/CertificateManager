@@ -58,6 +58,11 @@ namespace Certification.Backend
 
 			FileManagerCertificate fileManager = new(outputOptions.DatabasePaths, Logger, new ShaManager());
 			builder.Services.AddSingleton(fileManager);
+			builder.Services.AddSingleton<ICertificateAuthorityRepository>(services =>
+				new CertificateAuthorityRepository(
+					services.GetRequiredService<IConfiguration>(),
+					services.GetService<Serilog.ILogger>(),
+					builder.Environment.ContentRootPath));
 			builder.Services.AddSingleton<CertificateCommon.CertificationManager>();
 
 			var app = builder.Build();
@@ -74,6 +79,29 @@ namespace Certification.Backend
 
 			app.UseCors("Frontend");
 			app.UseHttpsRedirection();
+
+			var staticWebRoot = builder.Configuration["WebServer:StaticRoot"];
+			if(!string.IsNullOrWhiteSpace(staticWebRoot))
+			{
+				var resolvedStaticWebRoot = Path.GetFullPath(staticWebRoot, app.Environment.ContentRootPath);
+				if(Directory.Exists(resolvedStaticWebRoot))
+				{
+					var staticWebFileProvider = new PhysicalFileProvider(resolvedStaticWebRoot);
+					app.UseDefaultFiles(new DefaultFilesOptions
+					{
+						FileProvider = staticWebFileProvider
+					});
+					app.UseStaticFiles(new StaticFileOptions
+					{
+						FileProvider = staticWebFileProvider
+					});
+				}
+				else
+				{
+					Logger?.Warning("Static web root {StaticWebRoot} does not exist. Static web hosting is disabled.", resolvedStaticWebRoot);
+				}
+			}
+
 			app.UseFileServer(new FileServerOptions
 			{
 				FileProvider = new PhysicalFileProvider(Path.GetFullPath(outputOptions.PrimaryOutput, app.Environment.ContentRootPath)),
@@ -87,6 +115,18 @@ namespace Certification.Backend
 			app.UseAuthorization();
 
 			app.MapControllers();
+
+			if(!string.IsNullOrWhiteSpace(staticWebRoot))
+			{
+				var resolvedStaticWebRoot = Path.GetFullPath(staticWebRoot, app.Environment.ContentRootPath);
+				if(Directory.Exists(resolvedStaticWebRoot))
+				{
+					app.MapFallbackToFile("{*path:nonfile}", "index.html", new StaticFileOptions
+					{
+						FileProvider = new PhysicalFileProvider(resolvedStaticWebRoot)
+					});
+				}
+			}
 
 			app.Run();
 		}
