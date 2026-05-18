@@ -20,10 +20,7 @@
             .OrderBy(c => c.Solution ?? string.Empty)
             .ThenByDescending(c => c.Creation)
             .ToList();
-        var authorityLookup = (ViewModel.CertificateAuthorities ?? [])
-            .Where(authority => !string.IsNullOrWhiteSpace(authority.Id))
-            .GroupBy(authority => authority.Id!, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        var authorityLookup = BuildAuthorityLookup(ViewModel.CertificateAuthorities ?? []);
 
         EnsureSelection(certificates);
 
@@ -124,7 +121,10 @@
                             <h3>@GetCertificateTitle(selectedCertificate)</h3>
                             <span>@Display(selectedCertificate.CN)</span>
                         </div>
-                        <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(selectedCertificate.Id))">Modify</FluentButton>
+                        <div class="certificate-detail-actions">
+                            <FluentButton Color="Color.Success" OnClick="(() => ViewModel?.Regenerate(selectedCertificate.Id))">Modify</FluentButton>
+                            <FluentButton Color="Color.Error" OnClick="(() => DeleteSelected(selectedCertificate))">Delete</FluentButton>
+                        </div>
                     </div>
 
                     <div class="certificate-download-panel">
@@ -297,6 +297,27 @@
         }
     }
 
+    private async Task DeleteSelected(Certificate certificate)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>(
+            "confirm",
+            $"Delete certificate '{GetCertificateTitle(certificate)}' and its generated files?");
+
+        if(!confirmed)
+        {
+            return;
+        }
+
+        var solution = GetSolutionName(certificate);
+        var deleted = await (ViewModel?.Delete(certificate.Id) ?? Task.FromResult(false));
+        if(deleted)
+        {
+            var remainingCertificates = ViewModel?.Certificates?.CertificatesDB ?? [];
+            SelectedCertificateId = null;
+            SelectSolution(solution, remainingCertificates);
+        }
+    }
+
     private static string GetSolutionName(Certificate certificate)
     {
         return string.IsNullOrWhiteSpace(certificate.Solution)
@@ -344,6 +365,14 @@
                 : authority.Name;
         }
 
+        if(!string.IsNullOrWhiteSpace(certificate.IssuerThumbPrint)
+            && authorityLookup.TryGetValue(NormalizeThumbprint(certificate.IssuerThumbPrint), out authority))
+        {
+            return string.IsNullOrWhiteSpace(authority.Name)
+                ? Display(authority.Subject)
+                : authority.Name;
+        }
+
         if(!string.IsNullOrWhiteSpace(certificate.IssuerAuthorityId))
         {
             return certificate.IssuerAuthorityId;
@@ -367,12 +396,48 @@
             return string.IsNullOrWhiteSpace(thumbprint) ? role : $"{role} - {thumbprint}";
         }
 
+        if(!string.IsNullOrWhiteSpace(certificate.IssuerThumbPrint)
+            && authorityLookup.TryGetValue(NormalizeThumbprint(certificate.IssuerThumbPrint), out authority))
+        {
+            var role = string.IsNullOrWhiteSpace(authority.Role) ? "Issuer" : authority.Role;
+            var thumbprint = ShortThumbprint(authority.Thumbprint);
+            return string.IsNullOrWhiteSpace(thumbprint) ? role : $"{role} - {thumbprint}";
+        }
+
         if(!string.IsNullOrWhiteSpace(certificate.IssuerThumbPrint))
         {
             return ShortThumbprint(certificate.IssuerThumbPrint);
         }
 
         return "Legacy certificate";
+    }
+
+    private static Dictionary<string, CertificateAuthorityInfo> BuildAuthorityLookup(IEnumerable<CertificateAuthorityInfo> authorities)
+    {
+        var lookup = new Dictionary<string, CertificateAuthorityInfo>(StringComparer.OrdinalIgnoreCase);
+
+        foreach(var authority in authorities)
+        {
+            AddAuthorityLookup(lookup, authority.Id, authority);
+            AddAuthorityLookup(lookup, NormalizeThumbprint(authority.Thumbprint), authority);
+        }
+
+        return lookup;
+    }
+
+    private static void AddAuthorityLookup(Dictionary<string, CertificateAuthorityInfo> lookup, string? key, CertificateAuthorityInfo authority)
+    {
+        if(!string.IsNullOrWhiteSpace(key) && !lookup.ContainsKey(key))
+        {
+            lookup[key] = authority;
+        }
+    }
+
+    private static string NormalizeThumbprint(string? thumbprint)
+    {
+        return string.IsNullOrWhiteSpace(thumbprint)
+            ? string.Empty
+            : new string(thumbprint.Where(Uri.IsHexDigit).ToArray()).ToUpperInvariant();
     }
 
     private static string ShortThumbprint(string? thumbprint)

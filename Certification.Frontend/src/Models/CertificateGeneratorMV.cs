@@ -134,6 +134,35 @@ namespace CertificateManager.Client.src.Models
             _manager.NavigateTo($"/certificateGenerator/ID={id}");
         }
 
+        public async Task<bool> Delete(int? id)
+        {
+            if(id is null)
+            {
+                return false;
+            }
+
+            if(_factory is null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var deleted = await _factory.DeleteAsync($"api/Certificate/{id}");
+                if(deleted)
+                {
+                    Certificates?.CertificatesDB.RemoveAll(certificate => certificate.Id == id);
+                    OnStateChange("Certificate deleted");
+                }
+
+                return deleted;
+            }
+            catch(OperationCanceledException)
+            {
+                return false;
+            }
+        }
+
 
         public async void DownloadRootCRT(int? id)
         {

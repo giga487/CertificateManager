@@ -131,6 +131,32 @@ namespace Certification.Backend.Controllers
 			return Ok(CertificationManager.FileManager?.JSONMemory);
 		}
 
+		[HttpDelete("{id:int}")]
+		public IActionResult Delete(int id)
+		{
+			if(CertificationManager.FileManager is null)
+			{
+				return Problem("Certificate file manager is not available.");
+			}
+
+			if(!CertificationManager.FileManager.Delete(id, out var deletedFiles, out var failedFiles))
+			{
+				return NotFound($"No certificate with ID: {id}");
+			}
+
+			if(failedFiles.Count > 0)
+			{
+				Logger?.Warning("Deleted certificate {CertificateId}, but failed to delete files: {FailedFiles}", id, failedFiles);
+			}
+
+			return Ok(new
+			{
+				Id = id,
+				DeletedFiles = deletedFiles,
+				FailedFiles = failedFiles
+			});
+		}
+
 		[HttpGet("CARootInfo")]
 		public IActionResult CARootInfo(string? authorityId = null)
 		{

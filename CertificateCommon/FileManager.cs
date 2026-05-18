@@ -344,6 +344,101 @@ namespace CertificateManager.src
             }
         }
 
+        public bool Delete(int id, out IReadOnlyList<string> deletedFiles, out IReadOnlyList<string> failedFiles)
+        {
+            _lock.EnterWriteLock();
+            try
+            {
+                deletedFiles = [];
+                failedFiles = [];
+
+                var certificate = _lastJSonMemory?.CertificatesDB.FirstOrDefault(t => t.Id == id);
+                if(certificate is null)
+                {
+                    return false;
+                }
+
+                var filesReferencedByOtherCertificates = _lastJSonMemory!.CertificatesDB
+                    .Where(existing => existing.Id != id)
+                    .SelectMany(GetCertificateFilePaths)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var candidateFiles = GetCertificateFilePaths(certificate)
+                    .Where(path => !filesReferencedByOtherCertificates.Contains(path))
+                    .ToList();
+                var deleted = new List<string>();
+                var failed = new List<string>();
+
+                foreach(var filePath in candidateFiles)
+                {
+                    try
+                    {
+                        if(File.Exists(filePath))
+                        {
+                            File.Delete(filePath);
+                            deleted.Add(filePath);
+                        }
+                    }
+                    catch(Exception ex)
+                    {
+                        failed.Add($"{filePath}: {ex.Message}");
+                    }
+                }
+
+                _lastJSonMemory!.CertificatesDB.Remove(certificate);
+                SaveInternal();
+                TryDeleteEmptyCertificateDirectories(candidateFiles);
+
+                deletedFiles = deleted;
+                failedFiles = failed;
+                return true;
+            }
+            finally
+            {
+                _lock.ExitWriteLock();
+            }
+        }
+
+        private static IReadOnlyList<string> GetCertificateFilePaths(Certificate certificate)
+        {
+            string?[] paths =
+            [
+                certificate.PFXCertificate,
+                certificate.CertificatePem,
+                certificate.CRTCertificate,
+                certificate.DERCertificate,
+                certificate.RootDERCertificate,
+                certificate.IntermediateCertificate,
+                certificate.CertificateChain,
+                certificate.PrivateKeyPem
+            ];
+
+            return paths
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => Path.GetFullPath(path!))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static void TryDeleteEmptyCertificateDirectories(IEnumerable<string> filePaths)
+        {
+            foreach(var directory in filePaths
+                .Select(Path.GetDirectoryName)
+                .Where(directory => !string.IsNullOrWhiteSpace(directory))
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    if(Directory.Exists(directory) && !Directory.EnumerateFileSystemEntries(directory).Any())
+                    {
+                        Directory.Delete(directory);
+                    }
+                }
+                catch
+                {
+                }
+            }
+        }
+
         public void Load()
         {
             Load(_dbCertificates);

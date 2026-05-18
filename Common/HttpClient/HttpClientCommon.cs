@@ -253,6 +253,26 @@ namespace CommonBlazor.HttpClient
             return default;
         }
 
+        public async Task<bool> DeleteAsync(string address)
+        {
+            var client = _httpFactory?.CreateClient(ClientName);
+
+            if(client is not null)
+            {
+                try
+                {
+                    var response = await client.DeleteAsync(address);
+                    return response.IsSuccessStatusCode;
+                }
+                catch(Exception ex)
+                {
+                    _logger?.Information(ex.Message);
+                }
+            }
+
+            return false;
+        }
+
 
     }
 }

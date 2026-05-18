@@ -174,6 +174,118 @@ namespace UT
             Assert.AreEqual(certificates?.Max(certificate => certificate.Id), latestId);
         }
 
+        [TestMethod]
+        public void Delete_ShouldRemoveCertificateAndDeleteUniqueFiles()
+        {
+            var shaManager = new ShaManager();
+            using var fileManager = new FileManagerCertificate(_tempFile, null, shaManager);
+
+            fileManager.Add(
+                pfxFile: _tempPfxFile,
+                oid: "1.2.3",
+                company: "TestComp",
+                commonName: "CN_1",
+                crtRoot: _tempCrtFile,
+                derFile: null,
+                rootDerFile: null,
+                solution: "DeleteSolution",
+                name: "DeleteMe",
+                password: TestCertificatePassword,
+                rootThumbprint: "thumb",
+                address: "127.0.0.1",
+                applicationUri: "urn:localhost:TestComp:DeleteMe",
+                dns: ["delete.local"],
+                ipAddresses: ["127.0.0.1"],
+                organizationalUnit: "Unit",
+                locality: "Pisa",
+                state: "PI",
+                country: "IT",
+                validFromUtc: DateTimeOffset.UtcNow,
+                validToUtc: DateTimeOffset.UtcNow.AddDays(1),
+                keyUsages: ["DigitalSignature"],
+                keyAlgorithm: CertificatePrivateKeyAlgorithm.EcdsaP256.ToString(),
+                signatureHashAlgorithm: "SHA384");
+
+            var id = fileManager.JSONMemory?.CertificatesDB.Single().Id ?? -1;
+            var deleted = fileManager.Delete(id, out var deletedFiles, out var failedFiles);
+
+            Assert.IsTrue(deleted);
+            Assert.AreEqual(0, failedFiles.Count);
+            Assert.AreEqual(0, fileManager.JSONMemory?.CertificatesDB.Count);
+            Assert.IsFalse(File.Exists(_tempPfxFile));
+            Assert.IsFalse(File.Exists(_tempCrtFile));
+            Assert.AreEqual(2, deletedFiles.Count);
+        }
+
+        [TestMethod]
+        public void Delete_ShouldKeepFilesReferencedByOtherCertificates()
+        {
+            var shaManager = new ShaManager();
+            using var fileManager = new FileManagerCertificate(_tempFile, null, shaManager);
+
+            fileManager.Add(
+                pfxFile: _tempPfxFile,
+                oid: "1.2.3",
+                company: "TestComp",
+                commonName: "CN_1",
+                crtRoot: _tempCrtFile,
+                derFile: null,
+                rootDerFile: null,
+                solution: "SharedFileSolution",
+                name: "First",
+                password: TestCertificatePassword,
+                rootThumbprint: "thumb",
+                address: "127.0.0.1",
+                applicationUri: "urn:localhost:TestComp:First",
+                dns: ["first.local"],
+                ipAddresses: ["127.0.0.1"],
+                organizationalUnit: "Unit",
+                locality: "Pisa",
+                state: "PI",
+                country: "IT",
+                validFromUtc: DateTimeOffset.UtcNow,
+                validToUtc: DateTimeOffset.UtcNow.AddDays(1),
+                keyUsages: ["DigitalSignature"],
+                keyAlgorithm: CertificatePrivateKeyAlgorithm.EcdsaP256.ToString(),
+                signatureHashAlgorithm: "SHA384");
+
+            fileManager.Add(
+                pfxFile: _tempPfxFile,
+                oid: "1.2.3",
+                company: "TestComp",
+                commonName: "CN_2",
+                crtRoot: _tempCrtFile,
+                derFile: null,
+                rootDerFile: null,
+                solution: "SharedFileSolution",
+                name: "Second",
+                password: TestCertificatePassword,
+                rootThumbprint: "thumb",
+                address: "127.0.0.2",
+                applicationUri: "urn:localhost:TestComp:Second",
+                dns: ["second.local"],
+                ipAddresses: ["127.0.0.2"],
+                organizationalUnit: "Unit",
+                locality: "Pisa",
+                state: "PI",
+                country: "IT",
+                validFromUtc: DateTimeOffset.UtcNow,
+                validToUtc: DateTimeOffset.UtcNow.AddDays(1),
+                keyUsages: ["DigitalSignature"],
+                keyAlgorithm: CertificatePrivateKeyAlgorithm.EcdsaP256.ToString(),
+                signatureHashAlgorithm: "SHA384");
+
+            var id = fileManager.JSONMemory?.CertificatesDB.First().Id ?? -1;
+            var deleted = fileManager.Delete(id, out var deletedFiles, out var failedFiles);
+
+            Assert.IsTrue(deleted);
+            Assert.AreEqual(0, failedFiles.Count);
+            Assert.AreEqual(1, fileManager.JSONMemory?.CertificatesDB.Count);
+            Assert.IsTrue(File.Exists(_tempPfxFile));
+            Assert.IsTrue(File.Exists(_tempCrtFile));
+            Assert.AreEqual(0, deletedFiles.Count);
+        }
+
         private static void DeleteIfExists(string path)
         {
             if (!File.Exists(path))
