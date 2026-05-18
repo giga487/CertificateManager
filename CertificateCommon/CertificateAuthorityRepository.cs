@@ -328,7 +328,9 @@ namespace CertificateCommon
                         Certificate = certificate,
                         Source = GetSource(definition)
                     });
-                }
+
+					logger?.Warning($"!!! Certificate authority {certificate.FriendlyName} found in {definition.Name}" );
+				}
                 catch(Exception ex)
                 {
                     logger?.Warning("Error loading certificate authority {Id}: {Message}", definition.Id ?? definition.Name, ex.Message);

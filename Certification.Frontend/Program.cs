@@ -30,6 +30,8 @@ namespace Certification.Frontend
 				.CreateLogger()
 				.ForContext(Serilog.Core.Constants.SourceContextPropertyName, "Certification Frontend");
 
+			logger?.Information($"Backend uri: {backendUrl} - Environment: {builder.HostEnvironment.BaseAddress}, selected {backendUri}");
+
 			builder.Logging.ClearProviders();
 			builder.Logging.AddSerilog(logger);
 			builder.Services.AddSingleton(logger);

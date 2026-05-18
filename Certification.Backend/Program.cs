@@ -78,29 +78,7 @@ namespace Certification.Backend
 			}
 
 			app.UseCors("Frontend");
-			app.UseHttpsRedirection();
-
-			var staticWebRoot = builder.Configuration["WebServer:StaticRoot"];
-			if(!string.IsNullOrWhiteSpace(staticWebRoot))
-			{
-				var resolvedStaticWebRoot = Path.GetFullPath(staticWebRoot, app.Environment.ContentRootPath);
-				if(Directory.Exists(resolvedStaticWebRoot))
-				{
-					var staticWebFileProvider = new PhysicalFileProvider(resolvedStaticWebRoot);
-					app.UseDefaultFiles(new DefaultFilesOptions
-					{
-						FileProvider = staticWebFileProvider
-					});
-					app.UseStaticFiles(new StaticFileOptions
-					{
-						FileProvider = staticWebFileProvider
-					});
-				}
-				else
-				{
-					Logger?.Warning("Static web root {StaticWebRoot} does not exist. Static web hosting is disabled.", resolvedStaticWebRoot);
-				}
-			}
+			//app.UseHttpsRedirection();
 
 			app.UseFileServer(new FileServerOptions
 			{
@@ -112,21 +90,10 @@ namespace Certification.Backend
 					ContentTypeProvider = BuildCertificateContentTypeProvider()
 				}
 			});
+
 			app.UseAuthorization();
 
 			app.MapControllers();
-
-			if(!string.IsNullOrWhiteSpace(staticWebRoot))
-			{
-				var resolvedStaticWebRoot = Path.GetFullPath(staticWebRoot, app.Environment.ContentRootPath);
-				if(Directory.Exists(resolvedStaticWebRoot))
-				{
-					app.MapFallbackToFile("{*path:nonfile}", "index.html", new StaticFileOptions
-					{
-						FileProvider = new PhysicalFileProvider(resolvedStaticWebRoot)
-					});
-				}
-			}
 
 			app.Run();
 		}
